@@ -67,3 +67,35 @@
 #workspace-stage #constituents .constituent-open{width:30px;height:30px;padding:0!important;display:inline-flex;align-items:center;justify-content:center;
   color:#07210f!important;background:#3fcf6e!important;border:0!important;border-radius:6px;font:700 14px var(--reading-sans,-apple-system,sans-serif)!important}
 #workspace-stage #constituents .constituent-open:hover,#workspace-stage #constituents .constituent-open:focus-visible{background:#6ee79a!important;color:#04170a!important}
+
+/* ===== Terminal 3: one palette everywhere (taken from Market pulse) =====
+   amber = headings and labels, sky blue = key figures, green/red = moves, grey = notes */
+:root{--t3-key:#7cc4ff;--t3-head:#f0b35a}
+#workspace-stage #market-pulse .r24-snapshot-item strong{color:var(--t3-key)!important}
+#workspace-stage table thead th,#workspace-stage table thead th button,
+#workspace-stage #etf-tracker-panel .etf-table thead th,#workspace-stage #etf-tracker-panel .etf-table thead th *{color:var(--t3-head)!important}
+#workspace-stage table td.rd-num:not(.up):not(.down):not(.pos):not(.neg):not(.rd-pos):not(.rd-neg):not(.neutral){color:#cfe6ff}
+#workspace-stage .rd-pos{color:var(--up,#4ade80)!important}
+#workspace-stage .rd-neg{color:var(--down,#ff7078)!important}
+#workspace-stage #etf-tracker-panel .etf-table tr.etf-geo-group th,#workspace-stage tr.etf-geo-group th,#workspace-stage tr.watch-section th{color:var(--amber,#ffa028)!important;background:#161a22!important;font-size:12.5px!important;font-weight:600!important;letter-spacing:.02em!important}
+#workspace-stage .etf-stat .v,#workspace-stage .etf-stat strong{color:var(--t3-key)}
+
+/* Alignment: header follows its column. */
+#workspace-stage .rd-r{text-align:right!important}
+#workspace-stage .rd-l{text-align:left!important}
+#workspace-stage th.rd-r button,#workspace-stage th.rd-r .mt-sort{text-align:right!important;justify-content:flex-end!important}
+#workspace-stage th.rd-c,#workspace-stage td.rd-c{text-align:center!important}
+
+/* ETF main table: same look as every other table; no dead column on the right. */
+#workspace-stage #etf-tracker-panel .etf-table{width:100%!important;table-layout:auto!important}
+#workspace-stage #etf-tracker-panel .etf-table td,#workspace-stage #etf-tracker-panel .etf-table th{width:auto!important;white-space:nowrap}
+#workspace-stage #etf-tracker-panel .etf-table td:first-child,#workspace-stage #etf-tracker-panel .etf-table th:first-child{white-space:normal;min-width:240px}
+#workspace-stage .etf-compact-code{text-align:center!important;font-weight:700;color:var(--t3-key)}
+
+/* Removed on request: Market signals in Analytics. Notes fold behind an i button. */
+.rd-gone{display:none!important}
+.rd-note-btn{margin-left:8px;width:20px;height:20px;border-radius:50%;border:1px solid #4a5568;background:transparent;color:#8b93a1;font:600 12px/18px var(--reading-sans,-apple-system,sans-serif);cursor:pointer;padding:0;vertical-align:middle}
+.rd-note-btn[aria-expanded="true"]{color:#07210f;background:var(--t3-head);border-color:var(--t3-head)}
+
+.rd-note-btn::before{content:'i'}
+#workspace-stage table thead th{white-space:nowrap}

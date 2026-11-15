@@ -73,7 +73,10 @@ function r25SectionLinks(){
 function r24Fresh(item){return !intelligenceArchived(item);}
 function r24Item(host,item,label){
   const row=el('article','r24-item');row.append(item.url?r24Link(item.title,item.url):el('strong','',item.title));
-  row.append(el('div','mini',[label,item.published,item.source].filter(Boolean).join(' · ')));host.append(row);return row;
+  const M=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const when=String(item.published||'').replace(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}:\d{2}))?.*$/,(m,y,mo,d,hm)=>(+d)+' '+M[+mo-1]+(hm?', '+hm:''));
+  const lab=label==='Publisher report'?'':label;
+  row.append(el('div','mini',[lab,item.source,when].filter(Boolean).join(' · ')));host.append(row);return row;
 }
 function r24CalendarEvents(){
   const today=D.generatedAt.slice(0,10),seen=new Set();

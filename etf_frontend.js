@@ -45,6 +45,16 @@ function etfMarkets(){
   for(const market of markets)picker.add(new Option(market,market));
   picker.value=markets.includes(old)?old:'all';
 }
+// A one-day jump that reverses next day (bad FX or price print) is dropped, not drawn.
+function etfDespike(points){
+  if(points.length<5)return points;
+  const bad=new Set();
+  for(let i=1;i<points.length-1;i++){
+    const a=points[i-1].v,b=points[i].v,c=points[i+1].v;
+    if(Math.abs(a/c-1)<0.03&&Math.abs(b/((a+c)/2)-1)>0.05)bad.add(i);
+  }
+  return bad.size?points.filter((_,i)=>!bad.has(i)):points;
+}
 function etfRows(f,range=etfState.range,basis=etfState.basis){
   const raw=ETF_HISTORY.get(f.symbol)||[],adjusted=basis.startsWith('adjusted'),toGBP=basis.endsWith('gbp');
   const points=raw.map(p=>{
@@ -54,8 +64,9 @@ function etfRows(f,range=etfState.range,basis=etfState.basis){
     return price!=null&&price>0&&Number.isFinite(price)?{date:p[0],v:price}:null;
   }).filter(Boolean);
   if(!points.length)return [];
-  const start=startOf(points.at(-1).date,range);
-  return points.filter(p=>p.date>=start);
+  const clean=etfDespike(points);
+  const start=startOf(clean.at(-1).date,range);
+  return clean.filter(p=>p.date>=start);
 }
 function etfPerformance(f,range='1Y',basis=etfState.basis){
   const all=etfRows(f,range,basis);

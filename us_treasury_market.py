@@ -7,7 +7,7 @@ Quoted prices are *not* live/executable broker bids/asks. No synthetic prices.
 from html.parser import HTMLParser
 from pathlib import Path
 import datetime as dt
-import json
+import json,time
 import math
 import re
 import urllib.parse
@@ -138,6 +138,17 @@ def parse_json(blob,asof=None):
     return accept_rows(rows,asof)
 
 
+def api_get(url,tries=3,timeout=60):
+    last=None
+    for n in range(tries):
+        try:
+            req=urllib.request.Request(url,headers={'User-Agent':'PersonalMarketResearch/1.0','Accept':'application/json'})
+            with urllib.request.urlopen(req,timeout=timeout) as r:return r.read(20_000_000)
+        except Exception as e:
+            last=e;time.sleep(2*(n+1))
+    raise last
+
+
 def public_json(url):
     req=urllib.request.Request(url,headers={'User-Agent':'PersonalMarketResearch/1.0','Accept':'application/json'})
     with urllib.request.urlopen(req,timeout=10) as r:raw=r.read(10_000_000)
@@ -147,12 +158,13 @@ def public_json(url):
 # The original site keeps its saved snapshot; a new repository falls back to it
 # until it has published its own.
 LEGACY_PAGES='https://rs88pvyhzz-code.github.io/market-terminal/'
+SIBLING_PAGES='https://rs88pvyhzz-code.github.io/market-terminal-2/'
 
 def prior_file(path,url):
     if path.exists():
         try:return json.loads(path.read_text('utf-8'))
         except (OSError,ValueError):pass
-    for candidate in (url,url.replace(_PAGES,LEGACY_PAGES)):
+    for candidate in (url,url.replace(_PAGES,SIBLING_PAGES),url.replace(_PAGES,LEGACY_PAGES)):
         try:return public_json(candidate)
         except Exception:continue
     return None
@@ -161,6 +173,17 @@ def prior_file(path,url):
 def collect(core,opts):
     warnings=[];used_cache=0;today=dt.datetime.now(dt.timezone.utc).date();result=None
     if not opts.offline:
+        # Fast path: find the latest quote date with a tiny query, then fetch only that day.
+        # The single large sorted query used to time out on the build runner.
+        for i,base in enumerate((BASE,BACKUP_API)):
+            try:
+                head=json.loads(api_get(base+'?'+urllib.parse.urlencode({'sort':'-data_date','page[size]':'1','fields':'data_date'})))
+                latest=head['data'][0]['data_date']
+                q=urllib.parse.urlencode({'filter':'data_date:eq:'+latest,'page[size]':'2000','fields':FIELDS})
+                rows=json.loads(api_get(base+'?'+q)).get('data')
+                result=accept_rows(rows,today);break
+            except Exception as e:warnings.append('US Treasury FiscalData day query '+str(i+1)+': '+str(e)[:105])
+    if not opts.offline and result is None:
         for i,base in enumerate((BASE,BACKUP_API)):
             query=urllib.parse.urlencode({'sort':'-data_date','page[size]':'1500','fields':FIELDS})
             url=base+'?'+query

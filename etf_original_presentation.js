@@ -126,12 +126,21 @@ function etfV5PickMain(){
   }
   return {all,shown:all.filter(f=>keep.has(f.symbol)),suppressed:all.length-keep.size};
 }
+function etfShortMove(f,k){
+  try{const rows=etfRows(f,'MAX',etfState.basis);if(rows.length<2)return null;
+    const last=rows[rows.length-1];let base=null;
+    if(k==='1D')base=rows[rows.length-2];
+    else{const c=new Date(last.date+'T12:00:00Z');c.setUTCMonth(c.getUTCMonth()-1);const t=c.toISOString().slice(0,10);
+      for(let i=rows.length-1;i>=0;i--){if(rows[i].date<=t){base=rows[i];break;}}
+      if(base&&(new Date(last.date)-new Date(base.date))/864e5>40)return null;}
+    if(!base||!(base.v>0))return null;return 100*(last.v/base.v-1);}catch(e){return null;}
+}
 renderEtfTracker=function(){
   const etfViewport=$('etf-rows')?.closest('.etf-table-scroll'),savedTop=etfViewport?.scrollTop||0;
   _etfV5PriorRender(); // existing risk, issuer facts, chart, data-quality links preserved
   const tbody=$('etf-rows'),table=tbody?.closest('table'),thead=table?.querySelector('thead');
   if(!tbody||!table||!thead)return;
-  const labels=['Fund / ticker','TER','P/S','Fund AUM','1Y','3Y','5Y','Cmp'];
+  const labels=['Fund / ticker','TER','P/S','Fund size','1D','1M','1Y','3Y','5Y','Cmp'];
   const head=el('tr');
   for(const label of labels){const th=el('th','',label);th.scope='col';
     if(label==='TER')th.title='Annual ongoing charge. Not tracking error.';
@@ -146,7 +155,7 @@ renderEtfTracker=function(){
   for(const f of shown){
     const region=typeof etfRegion==='function'?etfRegion(f)[2]:f.market;
     if($('etf-sort')?.value==='market'&&region!==lastGroup){
-      const gr=el('tr','etf-geo-group'),th=el('th','',region||f.market);th.colSpan=8;th.scope='rowgroup';gr.append(th);frag.append(gr);lastGroup=region;
+      const gr=el('tr','etf-geo-group'),th=el('th','',region||f.market);th.colSpan=10;th.scope='rowgroup';gr.append(th);frag.append(gr);lastGroup=region;
     }
     const row=el('tr',f.symbol===etfState.selected?'etf-active':'');row.dataset.etfSymbol=f.symbol;
     row.setAttribute('aria-label','View details of '+f.name);
@@ -154,6 +163,7 @@ renderEtfTracker=function(){
     const fee=etfCell(row,etfFee(f),'n');fee.title=(f.terSource||f.terStatus||'Unverified')+(f.terCheckedAt?' · '+f.terCheckedAt:'');
     const [code,label]=etfV5Kind(f);const codecell=etfCell(row,code,'etf-compact-code');codecell.title=label+' · '+(f.replicationStatus||'unverified');
     const aum=etfCell(row,etfFundSize(f),'n');aum.title=(f.fundSizeSource||'Fund AUM unverified')+(f.fundSizeAsOf?' · '+f.fundSizeAsOf:'');
+    for(const y of ['1D','1M']){const v=etfShortMove(f,y);const c=etfCell(row,v==null?'—':etfPct(v),'n');c.title=y==='1D'?'Last close against previous close':'Last close against close one month earlier';}
     for(const y of ['1Y','3Y','5Y']){
       const cell=etfCell(row,etfPct(f['return'+y]),'n'),period=f.returnPeriods?.[y];
       cell.title=period ? y+' '+period.basis+': '+period.start+' to '+period.end+

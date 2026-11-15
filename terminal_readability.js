@@ -55,9 +55,11 @@
     '#market-valuations':['P/E coverage','Financials retrieved'],
     '#equity-screener':['Financials checked','Price history']
   };
+  HIDE['.mt-risk-table']=['Observations'];
   function hideCols(){
     for(const [sel,names] of Object.entries(HIDE)){
-      document.querySelectorAll(sel+' table').forEach(table=>{
+      const tables=sel.startsWith('#')?document.querySelectorAll(sel+' table'):document.querySelectorAll(sel);
+      tables.forEach(table=>{
         if(!table.tHead)return;
         const heads=[...table.tHead.rows[table.tHead.rows.length-1].cells];
         const idx=heads.map((h,i)=>names.includes(h.textContent.trim())?i:-1).filter(i=>i>=0);
@@ -147,6 +149,73 @@
     });
   }
 
+
+  // ---- Terminal 3 additions ----
+  // Currency: $ £ € symbols, never "USD 12.3bn" / "GBp".
+  const SYM={USD:'$',GBP:'£',EUR:'€',JPY:'¥'};
+  const NUMPART='[+\\-−]?\\d[\\d,]*(?:\\.\\d+)?\\s?(?:bn|tn|m|k)?';
+  const RE1=new RegExp('\\b(USD|GBP|EUR|JPY)\\s+('+NUMPART+')(?![\\w%])','g');
+  const RE2=new RegExp('(^|[^\\w.])('+NUMPART+')\\s+(USD|GBP|EUR|JPY)\\b','g');
+  function currency(){
+    const root=document.getElementById('workspace-stage');if(!root)return;
+    const w=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);let n;const todo=[];
+    while(n=w.nextNode()){const v=n.nodeValue;if(!/USD|GBP|EUR|JPY|GBp/.test(v))continue;
+      if(n.parentElement.closest('input,select,textarea,script,style,option'))continue;todo.push(n)}
+    todo.forEach(n=>{let v=n.nodeValue;
+      v=v.replace(RE1,(m,c,x)=>SYM[c]+x.replace(/\s/g,'')).replace(RE2,(m,pre,x,c)=>pre+SYM[c]+x.replace(/\s/g,''));
+      v=v.replace(/\bGBp\b/g,'GBP');
+      if(v!==n.nodeValue)n.nodeValue=v});
+  }
+  // Header follows its column: numeric columns right-aligned, text columns left.
+  function align(){
+    document.querySelectorAll('#workspace-stage table').forEach(table=>{
+      const hr=table.tHead&&table.tHead.rows.length?table.tHead.rows[table.tHead.rows.length-1]:null;if(!hr)return;
+      const heads=[...hr.cells];if(heads.length<2)return;
+      heads.forEach((h,i)=>{
+        let num=0,tot=0;
+        for(const tb of table.tBodies)for(const row of tb.rows){
+          if(row.cells.length!==heads.length||row.classList.contains('rd-orphan'))continue;
+          const c=row.cells[i];if(c.querySelector('input,button,canvas,svg'))continue;
+          const t=c.textContent.trim();if(!t)continue;tot++;if(c.classList.contains('rd-num')&&!/^\d{1,2} [A-Z][a-z]{2}/.test(t)||/^[—–-]$/.test(t))num++;
+        }
+        const cls=tot&&num/tot>=0.6?'rd-r':'rd-l';
+        [h,...[...table.tBodies].flatMap(tb=>[...tb.rows].filter(r=>r.cells.length===heads.length).map(r=>r.cells[i]))].forEach(c=>{
+          if(c.classList.contains(cls))return;c.classList.remove('rd-r','rd-l');
+          if(c.querySelector('input[type=checkbox]')||c.classList.contains('etf-compact-code')||/^P\/S$/.test(h.textContent.trim())){c.classList.add('rd-c');return}
+          c.classList.add(cls)});
+      });
+    });
+  }
+  // Return columns: green up, red down, everywhere.
+  function tone(){
+    const RET=/^(1D|1W|1M|3M|6M|YTD|1Y|3Y|5Y|10Y|Day|Week|Month|Year|Change|Ann\. price return)\b/i;
+    document.querySelectorAll('#workspace-stage table').forEach(table=>{
+      const hr=table.tHead&&table.tHead.rows.length?table.tHead.rows[table.tHead.rows.length-1]:null;if(!hr)return;
+      [...hr.cells].forEach((h,i)=>{if(!RET.test(h.textContent.trim().replace(/[▾▴]/g,'').trim()))return;
+        for(const tb of table.tBodies)for(const row of tb.rows){if(row.cells.length!==hr.cells.length)continue;
+          const c=row.cells[i];if(c.classList.contains('up')||c.classList.contains('down'))continue;
+          const t=c.textContent.trim().replace('−','-');if(!/%|bp|pp/.test(t))continue;
+          const neg=/^-/.test(t);const pos=/^\+/.test(t)||(/^\d/.test(t)&&parseFloat(t)>0);
+          c.classList.toggle('rd-neg',neg);c.classList.toggle('rd-pos',pos&&!neg)}});
+    });
+  }
+  // Drop Market signals; fold explanatory notes behind a small i button.
+  function slim(){
+    document.querySelectorAll('#workspace-stage h2,#workspace-stage h3').forEach(h=>{
+      if(/^market signals$/i.test(h.textContent.trim())){const box=h.closest('section,.panel')||h.parentElement;box.classList.add('rd-gone')}});
+    document.querySelectorAll('#r23-alerts').forEach(x=>x.classList.add('rd-gone'));
+    document.querySelectorAll('#workspace-stage a,#workspace-stage button').forEach(a=>{if(/^market signals$/i.test(a.textContent.trim()))a.classList.add('rd-gone')});
+    document.querySelectorAll('#workspace-stage .panel .note, #workspace-stage .research-hint, #workspace-stage .mt-inline-notice').forEach(note=>{
+      if(note.dataset.rdFolded||note.closest('table,details,.rd-gone')||/synthetic|warning|error|failed|unavailable/i.test(note.className+' '+note.textContent.slice(0,60)))return;
+      if(note.textContent.trim().length<40)return;
+      const panel=note.closest('.panel');const head=panel&&panel.querySelector('h2,h3');if(!head)return;
+      note.dataset.rdFolded='1';note.classList.add('rd-gone');
+      let btn=panel.querySelector(':scope .rd-note-btn');
+      if(!btn){btn=document.createElement('button');btn.type='button';btn.className='rd-note-btn';btn.setAttribute('aria-expanded','false');btn.title='About this table';head.append(btn);
+        btn.onclick=e=>{e.stopPropagation();const open=btn.getAttribute('aria-expanded')!=='true';btn.setAttribute('aria-expanded',open);panel.querySelectorAll('[data-rd-folded]').forEach(n=>n.classList.toggle('rd-gone',!open))}}
+    });
+  }
+
   let busy=false,queued=false;
   function apply(){
     if(busy)return;busy=true;
@@ -154,7 +223,7 @@
       header();pulse();
       document.querySelectorAll('#workspace-stage table').forEach(tableUtc);
       hideCols();orphans();priors();
-      document.querySelectorAll('#workspace-stage table tbody').forEach(datesIn);econDates();classify();
+      document.querySelectorAll('#workspace-stage table tbody').forEach(datesIn);econDates();classify();currency();align();tone();slim();
     }catch(e){console.warn('readability layer',e)}
     busy=false;
   }

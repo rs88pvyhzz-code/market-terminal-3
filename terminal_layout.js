@@ -358,7 +358,7 @@ function etfAlternatives(fund){
 }
 function etfMoney(f){
   if(!Number.isFinite(f.fundSize)||!f.fundSize)return '—';
-  const v=f.fundSize,c=f.fundSizeCurrency||'';return c+' '+(v>=1e9?fmt(v/1e9,2)+'bn':fmt(v/1e6,1)+'m');
+  const v=f.fundSize,c=f.fundSizeCurrency||'';return ((({USD:'$',GBP:'£',GBp:'£',GBX:'£',EUR:'€',JPY:'¥'})[c])??(c+' '))+(v>=1e9?fmt(v/1e9,2)+'bn':fmt(v/1e6,1)+'m');
 }
 function etfPct(v){return Number.isFinite(v)?(v>0?'+':'')+fmt(v,2)+'%':'—';}
 function renderEtfAlternatives(){
@@ -374,12 +374,12 @@ function renderEtfAlternatives(){
   else{
     const wrap=document.createElement('div');wrap.className='mt-table-scroll';
     const t=document.createElement('table');t.className='watch layout-alt-table';
-    t.innerHTML='<thead><tr><th>Fund / ticker</th><th>Index</th><th>TER</th><th>Fund size</th><th>1Y</th><th>3Y</th><th>5Y</th><th>Replication</th><th>Income</th><th>Chart</th></tr></thead>';
+    t.innerHTML='<thead><tr><th>Fund / ticker</th><th>Index</th><th>TER</th><th>Fund size</th><th>1Y</th><th>3Y</th><th>5Y</th><th>P/S</th><th>Income</th><th>Chart</th></tr></thead>';
     const tb=document.createElement('tbody');
     for(const f of [fund,...alts]){
       const tr=document.createElement('tr');if(f===fund)tr.className='selected';
       const cells=[null,f.benchmark||'—',Number.isFinite(f.terPct)?fmt(f.terPct,2)+'%':'—',etfMoney(f),etfPct(f.return1Y),etfPct(f.return3Y),etfPct(f.return5Y),
-        String(f.replication||'—').replace(/\s*\(submethod not confirmed\)/,''),f.distribution||'—'];
+        (r=>/synthetic|swap/i.test(r)?'S':/physical|full|sampl|optimi/i.test(r)?'P':'?')(String(f.replication||'')),f.distribution||'—'];
       const name=document.createElement('td');const b=document.createElement('button');b.type='button';b.className='layout-alt-pick';
       b.textContent=f.name+' · '+f.symbol;b.disabled=f===fund;b.onclick=()=>{etfState.selected=f.symbol;try{renderEtfTracker();}catch(e){}renderEtfAlternatives();};
       name.append(b);tr.append(name);
@@ -388,7 +388,7 @@ function renderEtfAlternatives(){
       tb.append(tr);
     }
     t.append(tb);wrap.append(t);box.append(wrap);
-    const p=document.createElement('p');p.className='note';p.textContent='Returns are annualised for 3Y and 5Y, in each fund\u2019s quoted currency. Same market first, then closely related markets; largest funds first.';box.append(p);
+    const p=document.createElement('p');p.className='note';
   }
   const anchor=detail.querySelector('.etf-stat-grid');
   if(anchor)anchor.after(box);else detail.prepend(box);

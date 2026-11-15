@@ -1330,7 +1330,7 @@ function comparisonPoints(q){
  const data=original.map(p=>({date:p.date,v:adjusted?p.adj:p.v})).filter(p=>Number.isFinite(p.v)&&p.v>0);
  if(gbp){const converted=data.map(p=>({date:p.date,v:priceToGBP(p.v,q.currency,p.date)})).filter(p=>p.v!=null&&Number.isFinite(p.v)&&p.v>0);
   if(converted.length<2)return {reason:'historical sterling FX rates missing or unsupported quote currency'};
-  return {pts:converted};}
+  return {pts:(typeof etfDespike==='function'?etfDespike(converted):converted)};}
  if(data.length<2)return {reason:adjusted?'dividend-adjusted closes were not supplied':'insufficient price history'};
  return {pts:data};
 }
@@ -3104,7 +3104,7 @@ etfDetails=function(){
 function etfFundSize(f){
   if(!(f.fundSize>0)||!f.fundSizeCurrency)return '—';
   const n=f.fundSize,short=n>=1e9?(n/1e9).toFixed(2)+'bn':n>=1e6?(n/1e6).toFixed(1)+'m':fmt(n,0);
-  return f.fundSizeCurrency+' '+short;
+  return ((({USD:'$',GBP:'£',GBp:'£',GBX:'£',EUR:'€',JPY:'¥'})[f.fundSizeCurrency])??(f.fundSizeCurrency+' '))+short;
 }
 function etfTD(v){return v==null||!Number.isFinite(+v)?'—':(v>0?'+':'')+fmt(v,2)+' pp';}
 
