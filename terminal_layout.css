@@ -1,0 +1,288 @@
+/* Terminal layout — Analytics grouping, on the original Terminal 1 tokens. */
+#layout-retired{display:none!important}
+.workspace-view{display:grid;gap:14px}
+.workspace-view[hidden]{display:none}
+.layout-group{display:grid;gap:14px;padding-top:6px}
+.layout-group[hidden]{display:none}
+.layout-group+.layout-group{margin-top:10px}
+.layout-group-head{display:flex;align-items:baseline;flex-wrap:wrap;gap:6px 12px;padding:6px 3px 7px;border-bottom:1px solid var(--amber,#ffa028)}
+.layout-group-head h2{margin:0;font:600 15px/1.4 var(--font,ui-monospace,Menlo,monospace);color:var(--amber,#ffa028);letter-spacing:.5px}
+.layout-context{margin:0;flex:1 1 220px;font:12px/1.5 var(--font,ui-monospace,Menlo,monospace);color:var(--fg,#ececef)}
+.layout-source{margin-left:auto;font:11px var(--font,ui-monospace,Menlo,monospace)}
+/* Panels that were sub-blocks of a parent panel get panel framing once they stand alone. */
+#view-analytics .watchlist-risk,
+#view-analytics .research-benchmark,
+#view-analytics .research-r2,
+#view-analytics .research-detail,
+#view-analytics .layout-subpanel,
+#view-analytics .etf-peer-box,
+#view-analytics #mt-gilt-tax,
+#view-analytics #gilt-ladder,
+#view-analytics #r23-market-conditions,
+#view-analytics #r23-alerts{background:var(--panel,#121215);border:1px solid var(--line,#2a2a30);border-radius:6px;padding:13px;margin:0;min-width:0}
+#view-analytics .layout-subpanel h3{margin-top:0}
+#view-analytics .chart{min-height:220px}
+/* Wide tables scroll inside their panel; the page never scrolls sideways. */
+#view-analytics table{min-width:100%}
+#view-analytics .small-scroll,#view-analytics .layout-group>section{overflow-x:auto}
+@media (max-width:600px){
+  .layout-group-head{padding:6px 2px}
+  .layout-source{margin-left:0}
+}
+/* Data tables: one value per line and horizontal scroll, as in Terminal 1.
+   An earlier layer set overflow-wrap:anywhere on cells, which broke headers and
+   numbers into one character per line on phones. */
+.workspace-view table.watch,.workspace-view table.mt-return-table{width:max-content;min-width:100%;table-layout:auto}
+.workspace-view table.watch th,.workspace-view table.watch td,
+.workspace-view table.mt-return-table th,.workspace-view table.mt-return-table td{overflow-wrap:normal;word-break:normal;white-space:nowrap}
+.workspace-view table.watch td:first-child{white-space:normal;min-width:12ch;max-width:30ch}
+.workspace-view :has(> table.watch),.workspace-view :has(> table.mt-return-table){overflow-x:auto;-webkit-overflow-scrolling:touch;max-width:100%}
+/* Jump-link chip bars, sub-tab strips and per-panel "data checks" buttons are
+   retired. Some are recreated when a view re-renders, so hide them by class too. */
+.terminal-subnav,.r25-section-links,#mt-bond-nav,.r210-research-jump,.t11-quality-shortcut,.mt-quality-link{display:none!important}
+.layout-group-body{display:grid;gap:14px;min-width:0}
+/* Scope stand-ins must not inherit the framing of the panels they stand in for. */
+.layout-group.scope-panel{background:none;border:0;padding:0;box-shadow:none}
+
+/* ===================================================================
+   Release 3.1 visual system — one look across every tab, on the
+   original Terminal 1 palette (black, amber, grey, green/red moves).
+   Tiles everywhere follow the US Treasuries presentation: one framed
+   grid, hairline dividers, amber mono label, large mono value, grey
+   mono caption. Later rules here win because this sheet loads last.
+   =================================================================== */
+:root{--t-bg:#09090b;--t-panel:#121215;--t-tile:#18181c;--t-tile-hi:#1e1e23;--t-line:#2c2c33;--t-amber:#ffa028;--t-fg:#ececef;--t-muted:#9a9aa3;
+  --t-mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace}
+
+/* Larger text everywhere. On tablets and desktops the whole terminal is scaled,
+   which keeps every proportion; on phones only the smallest text is raised. */
+@media (min-width:720px){#wrap,.wrap{zoom:1.12}}
+@media (max-width:719px){
+  #workspace-stage :is(.mini,.note,.obs,.d,small,.lab,.k,.key){font-size:max(12px,1em)!important}
+  #workspace-stage :is(td,th){font-size:13px}
+}
+
+/* Panels */
+#workspace-stage .panel,#workspace-stage .layout-group-body>section{border-radius:10px;border:1px solid var(--t-line);background:linear-gradient(180deg,#141418 0,var(--t-panel) 64px);box-shadow:0 1px 0 rgba(255,255,255,.03) inset,0 8px 24px rgba(0,0,0,.25)}
+#workspace-stage .panel>h2,#workspace-stage .panel>.row h2,#workspace-stage .panel>.row>div>h2{letter-spacing:.06em}
+#workspace-stage .note{line-height:1.55}
+
+/* Unified tiles (US Treasuries style) */
+#workspace-stage :is(.research-stats,.watchlist-kpis,.etf-stat-grid,.analytic-cards,.research-dashboard,.company-kpis,.mt-quality-grid,.r29-coverage-grid,.credit-kpis,.r28-gilt-yields,.r28-gilt-facts,.history-coverage-grid,.t11-ratios,#view-economics .macro){
+  display:grid;gap:1px!important;background:transparent!important;border:1px solid var(--t-line)!important;border-radius:8px;overflow:hidden;padding:0!important}
+#workspace-stage :is(.research-stats,.watchlist-kpis,.etf-stat-grid,.analytic-cards,.research-dashboard,.company-kpis,.mt-quality-grid,.r29-coverage-grid,.credit-kpis,.r28-gilt-yields,.r28-gilt-facts,.history-coverage-grid,.t11-ratios,#view-economics .macro)>*{
+  background:var(--t-tile)!important;border:0!important;border-radius:0!important;box-shadow:0 0 0 1px var(--t-line)!important;padding:9px 12px!important;min-height:0!important;min-width:0;display:flex;flex-direction:column;gap:4px;justify-content:flex-start}
+#workspace-stage :is(.research-stats,.watchlist-kpis,.etf-stat-grid,.analytic-cards,.research-dashboard,.company-kpis,.mt-quality-grid,.r29-coverage-grid,.credit-kpis,.r28-gilt-yields,.r28-gilt-facts,.history-coverage-grid,.t11-ratios,#view-economics .macro)>*>:first-child{
+  font:500 12px/1.35 var(--reading-sans)!important;color:#c9d4e1!important;letter-spacing:normal;text-transform:none!important}
+#workspace-stage :is(.research-stats,.watchlist-kpis,.etf-stat-grid,.analytic-cards,.research-dashboard,.company-kpis,.mt-quality-grid,.r29-coverage-grid,.credit-kpis,.r28-gilt-yields,.r28-gilt-facts,.history-coverage-grid,.t11-ratios,#view-economics .macro)>*>:nth-child(2){
+  font:400 18px/1.3 var(--t-mono)!important;color:var(--t-fg);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+#workspace-stage :is(.research-stats,.watchlist-kpis,.etf-stat-grid,.analytic-cards,.research-dashboard,.company-kpis,.mt-quality-grid,.r29-coverage-grid,.credit-kpis,.r28-gilt-yields,.r28-gilt-facts,.history-coverage-grid,.t11-ratios,#view-economics .macro)>*>:nth-child(n+3){
+  font:400 12px/1.45 var(--reading-sans)!important;color:var(--t-muted)}
+#workspace-stage :is(.research-stats,.watchlist-kpis,.etf-stat-grid,.analytic-cards,.research-dashboard,.company-kpis,.credit-kpis,.r28-gilt-yields,.r28-gilt-facts)>*>:nth-child(n+3):is(.pos,.up,.good){color:#5fd39a}
+#workspace-stage :is(.research-stats,.watchlist-kpis,.etf-stat-grid,.analytic-cards,.research-dashboard,.company-kpis,.credit-kpis,.r28-gilt-yields,.r28-gilt-facts)>*>:nth-child(n+3):is(.neg,.down,.bad){color:#ff6b6b}
+#workspace-stage .r28-gilt-yields>*>:nth-child(2){font-size:26px!important;color:var(--t-fg)}
+#workspace-stage .r28-gilt-single{background:transparent!important;border:0!important;padding:0!important;display:grid;gap:12px}
+#workspace-stage .r28-gilt-caption{font:500 12px var(--t-mono)!important;color:var(--t-muted)!important;letter-spacing:.04em;text-transform:uppercase}
+#workspace-stage .pulse-board{border-radius:8px;overflow:hidden}
+
+/* Tables */
+#workspace-stage table.watch thead th{background:#16161a;color:var(--t-amber);font:500 11.5px/1.4 var(--t-mono);letter-spacing:.05em;text-transform:uppercase;border-bottom:1px solid var(--t-line);position:sticky;top:0;z-index:1}
+#workspace-stage table.watch td{font-variant-numeric:tabular-nums;border-bottom:1px solid #1d1d22}
+#workspace-stage table.watch tbody tr:hover td{background:#17171c}
+#workspace-stage table.watch tbody tr.selected td{background:#2a2112}
+
+/* Global prices sections */
+#workspace-stage tr.watch-section th{position:static;text-align:left;background:linear-gradient(90deg,rgba(255,160,40,.14),rgba(255,160,40,0) 60%);color:var(--t-amber);font:600 12px/1.4 var(--t-mono);letter-spacing:.08em;text-transform:uppercase;padding:12px 12px 8px;border-bottom:1px solid rgba(255,160,40,.35);border-top:10px solid var(--t-panel)}
+#workspace-stage tr.watch-section:first-child th{border-top:0}
+#workspace-stage .watch-section-count{color:var(--t-muted);font-weight:400;margin-left:8px}
+#workspace-stage tr.watch-section:hover th{background:linear-gradient(90deg,rgba(255,160,40,.14),rgba(255,160,40,0) 60%)}
+
+/* Economic calendar */
+#workspace-stage .r24-untracked{color:var(--t-muted);font-style:italic}
+
+/* Buttons and pills */
+#workspace-stage .btn{border-radius:6px}
+#workspace-stage .btn.active{box-shadow:0 0 0 1px rgba(255,160,40,.5),0 4px 14px rgba(255,160,40,.18)}
+@media (min-width:720px){#workspace-stage table.watch,#workspace-stage table.mt-return-table{width:100%}}
+#workspace-stage .r28-gilt-advanced{font:400 11.5px/1.5 var(--t-mono)!important;color:var(--t-muted)!important;border-top:1px solid var(--t-line)!important}
+#workspace-stage .r28-gilt-yields{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))!important}
+#workspace-stage .r28-gilt-facts{grid-template-columns:repeat(auto-fit,minmax(180px,1fr))!important}
+/* Reported snapshot figures merged into the company overview tiles */
+#workspace-stage .layout-merged-kpis{margin-top:-1px;border-top-left-radius:0!important;border-top-right-radius:0!important}
+#workspace-stage #research-overview .research-dashboard:has(+ .layout-merged-kpis){border-bottom-left-radius:0!important;border-bottom-right-radius:0!important}
+#workspace-stage .layout-merged-kpis>[hidden]{display:none!important}
+#workspace-stage #research-overview .research-dashboard,#workspace-stage .layout-merged-kpis{grid-template-columns:repeat(auto-fill,minmax(230px,1fr))!important;margin-bottom:0!important}
+#workspace-stage .layout-merged-kpis{margin-top:0!important;border-top:0!important}
+#workspace-stage .layout-merged-kpis>*>*{white-space:normal!important;overflow:visible!important;text-overflow:clip!important}
+/* Phones: every data table scrolls sideways instead of squeezing headers into
+   one letter per line (gilts, US Treasuries, calendars and the rest). */
+@media (max-width:719px){
+  #workspace-stage table{width:max-content!important;min-width:100%!important;table-layout:auto!important}
+  #workspace-stage table th{white-space:nowrap!important;overflow-wrap:normal!important;word-break:normal!important;width:auto!important}
+  #workspace-stage table td{overflow-wrap:normal;word-break:normal}
+  #workspace-stage :has(> table){overflow-x:auto;-webkit-overflow-scrolling:touch;max-width:100%}
+}
+/* Company overview: one ordered metrics grid with group headings */
+#workspace-stage .layout-metrics{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:1px;border:1px solid var(--t-line);border-radius:8px;overflow:hidden;background:transparent}
+#workspace-stage .layout-metrics>.research-dashboard,#workspace-stage .layout-metrics>.layout-merged-kpis{display:contents!important}
+#workspace-stage .layout-metrics-head{grid-column:1/-1;background:#141418;color:var(--t-muted);font:600 11px/1.4 var(--t-mono);letter-spacing:.08em;text-transform:uppercase;padding:9px 16px;box-shadow:0 0 0 1px var(--t-line)}
+/* Price moves by period: section headings between asset classes */
+#workspace-stage .mt-mover-section{margin:14px 0 6px;padding:6px 10px;background:linear-gradient(90deg,rgba(255,160,40,.14),rgba(255,160,40,0) 60%);border-bottom:1px solid rgba(255,160,40,.35);color:var(--t-amber);font:600 12px/1.4 var(--t-mono);letter-spacing:.08em;text-transform:uppercase}
+#workspace-stage .mt-mover-section:first-child{margin-top:0}
+#workspace-stage .r23-news-search{font:500 11px var(--t-mono);color:var(--t-amber);margin-left:8px;white-space:nowrap}
+
+/* ---------------- Release 3.3 ---------------- */
+.layout-hidden,.layout-subtab-hidden{display:none!important}
+/* Price moves: compact rows */
+#workspace-stage .mt-mover-row{min-height:0!important;padding:3px 0!important;margin:0!important;gap:10px!important}
+#workspace-stage .mt-mover-name{font-size:13px!important;line-height:1.3!important}
+#workspace-stage .mt-mover-track{height:10px!important}
+#workspace-stage .mt-mover-track span{height:10px!important}
+#workspace-stage .mt-mover-row .up,#workspace-stage .mt-mover-row .down{font-size:13px!important}
+#workspace-stage .mt-mover-section{margin:10px 0 4px;padding:4px 10px}
+/* News: larger headlines and dates */
+#workspace-stage :is(.news-item,.r24-item) > a,#workspace-stage :is(.news-item,.r24-item) > strong{font-size:17px!important;line-height:1.45!important}
+#workspace-stage :is(.news-item,.r24-item) :is(.meta,.mini){font-size:13px!important}
+#workspace-stage :is(.news-item,.r24-item){padding:12px 0!important}
+/* Sub-tabs (Bonds & Rates) */
+.layout-subtabs{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 4px;position:sticky;top:var(--r24-nav-height,0);z-index:5;background:var(--t-bg,#09090b);padding:6px 0}
+.layout-subtabs .btn{font:500 13px var(--t-mono)}
+/* ETF alternatives */
+#layout-etf-alternatives{margin:14px 0;background:var(--t-panel);border:1px solid var(--t-line);border-radius:8px;padding:13px}
+#layout-etf-alternatives h3{margin:0 0 10px;color:var(--t-amber);font:600 13px var(--t-mono);letter-spacing:.06em}
+.layout-alt-pick{background:none;border:0;padding:0;color:var(--t-fg);font:inherit;text-align:left;cursor:pointer;white-space:normal}
+.layout-alt-pick:not(:disabled):hover{color:var(--t-amber);text-decoration:underline}
+.layout-alt-pick:disabled{color:var(--t-amber);cursor:default}
+#layout-sovereign-table{margin-top:10px}
+
+/* Compact presentation: readable text, less framing and more information per screen. */
+#wrap,.wrap{zoom:1!important}
+#commandbar{padding:6px 0!important}
+#commandbar .commandline{padding:0!important;margin:0 0 5px!important;gap:12px;align-items:center}
+#commandbar .commandline>.label{font:12px/1.3 system-ui,sans-serif}
+#commandbar .commandline>.label .mini{display:none}
+#commandbar #global-search{min-height:40px!important;padding:8px 12px 8px 36px!important;font-size:14px!important}
+#workspace-tabs{gap:5px!important;padding:0!important;display:flex!important;flex-wrap:nowrap!important;overflow-x:auto!important;max-width:100%}
+#workspace-tabs [role=tab]{min-height:44px!important;padding:8px 10px!important;font:500 12px/1.2 system-ui,sans-serif!important;letter-spacing:0!important;white-space:nowrap;flex-shrink:0}
+#workspace-stage .workspace-title{gap:5px;margin:0;padding:6px 0}
+#workspace-stage .workspace-title>span{display:none}
+#workspace-stage .workspace-view,#workspace-stage .layout-group-body{gap:10px}
+#workspace-stage .panel,#workspace-stage .layout-group-body>section{padding:12px;border-radius:5px;box-shadow:none;background:var(--t-panel)}
+#workspace-stage .note{line-height:1.35}
+#workspace-stage :is(table.watch,.mt-return-table) td{padding:6px 9px;line-height:20px;font-size:13px}
+#workspace-stage :is(table.watch,.mt-return-table) tbody tr:nth-child(even):not(.selected) td{background-color:rgba(255,255,255,.018)}
+#workspace-stage :is(table.watch,.mt-return-table) th{padding:6px 9px;font-size:12px;letter-spacing:0}
+#workspace-stage tr.watch-section th{padding:5px 9px;border-top-width:4px;background:#1b1a18;font-size:11px}
+#workspace-stage table td:first-child,#workspace-stage table th:first-child{font-family:system-ui,sans-serif}
+#workspace-stage :is(.research-stats,.watchlist-kpis,.etf-stat-grid,.analytic-cards,.research-dashboard,.company-kpis,.credit-kpis,.r28-gilt-yields,.r28-gilt-facts)>*{padding:9px 11px!important;gap:4px}
+#workspace-stage :is(.research-stats,.watchlist-kpis,.etf-stat-grid,.analytic-cards,.research-dashboard,.company-kpis,.credit-kpis,.r28-gilt-yields,.r28-gilt-facts)>*>:first-child{font:500 12px/1.3 system-ui,sans-serif!important;color:var(--t-muted)!important}
+#workspace-stage :is(.news-item,.r24-item,.company-story){font-family:system-ui,sans-serif;padding:8px 0!important}
+#workspace-stage .layout-jumps{display:flex;flex-wrap:wrap;gap:4px 14px;width:100%;margin:3px 0}
+.layout-jumps button{border:0;background:none;color:var(--t-muted);font:12px/1.4 system-ui,sans-serif;cursor:pointer;padding:5px 0;text-align:left}
+.layout-jumps button:hover,.layout-jumps button:focus-visible{color:var(--t-amber);text-decoration:underline}
+#workspace-stage :is(section,[id^=research-],#score-panel){scroll-margin-top:140px}
+#workspace-stage .mt-reading-note{display:block!important;font:12px/1.4 system-ui,sans-serif;color:var(--t-muted);margin:6px 0}
+#score-panel .mt-period-controls{display:flex;flex-wrap:wrap;align-items:center;gap:8px 18px;margin:8px 0}
+#score-panel .mt-period-controls label{display:flex;align-items:center;gap:7px;font:12px system-ui,sans-serif}
+#score-panel .mt-period-controls select{min-height:40px;font-size:13px}
+#score-panel .mt-return-table{width:100%;min-width:720px;border-collapse:separate;border-spacing:0}
+#score-panel .mt-return-table th,#score-panel .mt-return-table td{white-space:nowrap;width:auto;text-align:right}
+#score-panel .mt-return-table :is(th,td):first-child{text-align:left}
+#score-panel .mt-performance-scroll{max-height:560px;max-height:min(62vh,560px);overflow:auto;border:1px solid var(--t-line);border-radius:4px}
+#score-panel thead th{position:sticky;top:0;z-index:2;background:#1b1b20}
+#score-panel .mt-return-table td.up{background:rgba(55,177,120,.09)!important}
+#score-panel .mt-return-table td.down{background:rgba(222,85,85,.09)!important}
+#score-panel .mt-selected-period{box-shadow:inset 1px 0 #6d5834,inset -1px 0 #6d5834}
+#score-panel .mt-sort{border:0;background:transparent;color:inherit;font:inherit;min-height:36px;cursor:pointer;padding:0 4px}
+#score-panel th.mt-selected-period .mt-sort{color:var(--t-amber)}
+#score-panel .mt-currency{font-size:11px;color:var(--t-muted)}
+#company-news-panel #company-insight{border:0;background:none;box-shadow:none;padding:0;margin:0}
+#company-news-panel #company-news-list{display:flex!important;flex-direction:column;gap:0}
+#company-news-panel .r213-company-evidence{display:block;width:100%;font:14px/1.4 system-ui,sans-serif}
+#company-news-panel h4{margin:12px 0 6px;font:600 12px/1.3 system-ui,sans-serif;letter-spacing:.02em;color:var(--t-muted)}
+#company-news-panel .r23-observation{padding:7px 0;border-bottom:1px solid var(--t-line);margin:0}
+#company-news-panel .r213-source-links{display:flex;flex-wrap:wrap;gap:4px 18px;font-size:12px;margin-top:4px}
+#company-news-panel .r213-results-table{width:100%;border-collapse:collapse;margin-top:6px}
+#company-news-panel .r213-results-table th{font-weight:400;text-align:left;white-space:normal;padding:6px 0;border-bottom:1px solid var(--t-line)}
+#company-news-panel .r213-results-table td{text-align:right;font:14px/1.4 var(--t-mono);white-space:nowrap;padding:6px 0 6px 12px;border-bottom:1px solid var(--t-line)}
+#company-news-panel .r213-results-table small{display:block;font:12px/1.35 system-ui,sans-serif;color:var(--t-muted)}
+#company-news-panel .company-story{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(120px,220px);align-items:start;gap:8px 18px;min-height:0!important;height:auto!important;border:0;border-bottom:1px solid var(--t-line);border-radius:0;background:none;margin:0}
+#company-news-panel .company-story a{font:14px/1.4 system-ui,sans-serif}
+#company-news-panel .company-story>span{font:12px/1.4 system-ui,sans-serif;color:var(--t-muted);margin:0!important;align-self:start}
+#company-news-panel .company-news-links{margin-top:10px;gap:8px}
+#company-news-panel .company-news-links a{padding:7px 10px;font-size:11px}
+#company-news-panel .r213-supporting{border-top:1px solid var(--t-line);margin-top:10px}
+#r24-conditions .r24-table{font-size:12px}
+#r24-conditions .r24-table :is(td,th){padding:5px 8px;line-height:1.35}
+@media(max-width:760px){
+ #commandbar .commandline>.label{display:none}
+ #commandbar .global-search-wrap{width:100%}
+ #workspace-stage .panel{padding:10px}
+ #company-news-panel .company-story{grid-template-columns:1fr;gap:3px}
+ #score-panel .mt-performance-scroll{max-height:60vh}
+ #score-panel .mt-return-table{min-width:720px}
+ #workspace-stage .layout-jumps{gap:2px 10px}
+}
+#layout-market-prices{margin-bottom:16px;min-width:0;max-width:100%}
+#monitor #layout-market-prices>.scroll{max-height:460px;overflow:auto}
+#personal-watchlist-panel .watchlist-bottom{margin:8px 0 12px}
+#personal-watchlist-panel .company-news-list{display:flex;flex-direction:column}
+#personal-watchlist-panel .company-story{min-height:0;height:auto;gap:4px;padding:8px 0}
+#workspace-stage .research-warning:not([hidden]),#workspace-stage .mt-inline-notice:not([hidden]){display:block!important}
+#workspace-stage [hidden]{display:none!important}
+@media(max-width:760px){
+ .terminal1-design.release212 #view-overview #r24-conditions .r24-table{table-layout:auto;min-width:650px}
+ .terminal1-design.release212 #view-overview #r24-conditions th:nth-child(n+3),
+ .terminal1-design.release212 #view-overview #r24-conditions td:nth-child(n+3){display:table-cell}
+}
+
+/* Let grid children shrink; contain long tables without widening the page. */
+#workspace-stage .workspace-view,#workspace-stage .layout-group-body,#workspace-stage .panel,#monitor>*{min-width:0}
+#company-news-panel,#company-news-list,#company-news-panel .r213-company-evidence{min-width:0;max-width:100%;overflow-wrap:anywhere}
+@media(max-width:760px){#company-news-panel .r213-results-table{table-layout:fixed}#company-news-panel .r213-results-table th{width:62%}#company-news-panel .r213-results-table td{white-space:normal;overflow-wrap:anywhere}}
+/* Native selects and populated calendar content must shrink on phones. */
+#workspace-stage .inputs{min-width:0;max-width:100%}
+#workspace-stage select.field{min-width:0;max-width:100%;box-sizing:border-box}
+#calendar>.row,#calendar-filters,#calendar-items{min-width:0;max-width:100%}
+#calendar-filters{flex-wrap:wrap!important}
+#calendar-items{overflow-x:auto}
+#workspace-stage #etf-tracker-panel .etf-detail .etf-stat .v{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace!important}
+#workspace-stage #etf-tracker-panel .etf-table td{font-size:12px!important}
+
+#watchlist-changes{margin:10px 0;padding:12px;border:1px solid var(--t-line);border-radius:5px;min-width:0;overflow-wrap:anywhere}
+#watchlist-changes h3{color:var(--t-amber);font-size:13px;margin:0 0 6px}
+.watch-change-group{display:grid;grid-template-columns:110px minmax(0,1fr);gap:6px 12px;border-top:1px solid var(--t-line);padding:8px 0}
+.watch-change-group>strong{grid-row:span 3;font-size:13px}
+.watch-change-row{font:13px/1.4 system-ui,sans-serif}.watch-change-row small{display:block}.watch-change-row a{font-size:12px}
+@media(max-width:600px){.watch-change-group{grid-template-columns:1fr}.watch-change-group>strong{grid-row:auto}}
+
+#company-coverage-gaps{padding:10px 0;border-bottom:1px solid var(--t-line);margin-bottom:10px;overflow-wrap:anywhere;font:13px/1.4 system-ui,sans-serif}#company-coverage-gaps>strong{color:var(--t-amber)}#company-coverage-gaps p{margin:5px 0}
+
+/* Yield curves: curve strip (level, day change in bp, 2s10s). */
+#layout-curve-strip{margin:4px 0 14px}
+#layout-curve-strip table{width:100%;min-width:0!important}
+@media (max-width:600px){#layout-curve-strip th:nth-child(5),#layout-curve-strip td:nth-child(5),#layout-curve-strip th:last-child,#layout-curve-strip td:last-child{display:none}#layout-curve-strip th,#layout-curve-strip td{padding:6px 3px!important;font-size:11px!important}#layout-curve-strip td.n>div:first-child{font-size:12px!important}.layout-curve-src{display:none}}
+#layout-curve-strip td:first-child{white-space:nowrap;color:var(--t-fg)}
+#layout-curve-strip td.n>div:first-child{font:500 14px/1.3 var(--t-mono,ui-monospace,monospace);font-variant-numeric:tabular-nums}
+.layout-curve-chg{font:11px/1.3 var(--t-mono,ui-monospace,monospace);color:var(--t-muted,#96969f);font-variant-numeric:tabular-nums}
+
+.news-pagination{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);margin:4px 0}
+
+.news-visit-controls{display:flex;align-items:center;flex-wrap:wrap;gap:8px 14px;margin:8px 0 14px;font-size:12px;color:var(--muted)}
+.news-visit-controls a{color:var(--amber)}
+.news-new{display:inline-block;font:600 10px/1.4 var(--font);color:var(--amber);border:1px solid currentColor;border-radius:3px;padding:1px 4px;margin:0 6px 4px 0}
+#company-coverage-gaps .layout-hidden{display:block!important}
+
+/* One reading family for language; tabular monospace for financial values. */
+:root{--reading-sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif}
+#workspace-stage :is(h1,h2,h3,h4,.layout-metrics-head,.layout-context,.mini,.note,.obs,.d,small,.lab,.k,.key,.chart-series-labels),
+.commandbar :is(button,label),#workspace-stage :is(button,label,select),.table-reading-head th{
+ font-family:var(--reading-sans)!important;letter-spacing:normal!important;text-transform:none!important}
+#workspace-stage :is(h2,h3,h4,.layout-metrics-head){font-size:14px!important;font-weight:600!important;line-height:1.4!important}
+#workspace-stage :is(.note,.obs,.d,small,.layout-context){font-size:12px!important;line-height:1.45!important;color:#b8bec8}
+#workspace-stage table th{font-family:var(--reading-sans)!important;letter-spacing:normal!important;text-transform:none!important}
+#workspace-stage table td.n{font-family:var(--t-mono)!important;font-variant-numeric:tabular-nums}
+#workspace-stage .layout-metrics .metric-commentary>:nth-child(2){font:400 13px/1.45 var(--reading-sans)!important;color:#b8bec8!important}
+#workspace-stage .layout-metrics .metric-commentary>:nth-child(n+3){display:block!important}
+#workspace-stage .layout-metrics [hidden]{display:none!important}
+#workspace-stage .layout-metrics{align-items:start}
