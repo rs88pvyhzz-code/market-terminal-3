@@ -123,11 +123,15 @@ function r24Conditions(host){
   const list=values=>{const box=el('div');if(!values.length)box.textContent='Unavailable';values.forEach(value=>box.append(el('div','r24-line',value)));return box;};
   const uk=(D.uk_rates||[]).filter(x=>Number.isFinite(x.gilt10y)),us=(D.us_rates||[]).filter(x=>Number.isFinite(x.DGS10)),u=uk.at(-1),p=uk.at(-2),s=us.at(-1),t=us.at(-2),two=latestField(D.us_rates,'DGS2');
   const curve=s&&two&&s.date===two.date?((s.DGS10-two.DGS2)*100).toFixed(0)+' bp':'Unavailable';
-  r24Table(host,['Indicator','Latest observation','Change / context','Observation date'],[
-    ['Volatility',vix?'VIX '+fmt(vix.price,2):'Unavailable',vix?pc(vix.changePct):'Unavailable',vix?.asOf||'Unavailable'],
-    ['Market breadth',list(breadth.map(b=>b.name+': '+b.advancers+' advancing / '+b.decliners+' declining')),list(breadth.map(b=>b.quoted+'/'+b.members+' quoted; above 200D '+b.above200+'/'+b.eligible200)),list(breadth.map(b=>b.name+' '+b.date))],
-    ['Sovereign yields / curve',list([u?'UK 10Y '+fmt(u.gilt10y,2)+'%':'UK unavailable',s?'US 10Y '+fmt(s.DGS10,2)+'%':'US unavailable']),list([u&&p?'UK '+fmt((u.gilt10y-p.gilt10y)*100,1)+' bp since '+p.date:'UK change unavailable',s&&t?'US '+fmt((s.DGS10-t.DGS10)*100,1)+' bp since '+t.date:'US change unavailable','US 10Y−2Y '+curve]),list([u?'UK '+u.date:'UK date unavailable',s?'US '+s.date:'US date unavailable'])],
-    ['Credit spreads',list(credit.map(c=>c.name+' '+fmt(c.latestBp,0)+' bp')),list(credit.map(c=>c.name+' 1M '+fmt(c.change30Bp,0)+' bp')),list(credit.map(c=>c.name+' '+c.date))]
+  const MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const dm=d=>{const m=String(d||'').match(/(\d{4})-(\d{2})-(\d{2})/);return m?(+m[3])+' '+MON[+m[2]-1]:String(d||'Unavailable')};
+  const sg=n=>(n>0?'+':'')+fmt(n,1);
+  const bdates=[...new Set(breadth.map(b=>dm(b.date)))];
+  r24Table(host,['Indicator','Latest observation','Change / context','Date'],[
+    ['Volatility',vix?'VIX '+fmt(vix.price,2):'Unavailable',vix?pc(vix.changePct):'Unavailable',vix?dm(vix.asOf):'Unavailable'],
+    ['Market breadth',list(breadth.map(b=>b.name+': '+b.advancers+' up / '+b.decliners+' down')),list(breadth.map(b=>b.above200+'/'+b.eligible200+' above 200D')),list(bdates)],
+    ['Sovereign yields / curve',list([u?'UK 10Y '+fmt(u.gilt10y,2)+'%':'UK unavailable',s?'US 10Y '+fmt(s.DGS10,2)+'%':'US unavailable','US 10Y−2Y '+curve]),list([u&&p?sg((u.gilt10y-p.gilt10y)*100)+' bp since '+dm(p.date):'Unavailable',s&&t?sg((s.DGS10-t.DGS10)*100)+' bp since '+dm(t.date):'Unavailable','']),list([u?dm(u.date):'Unavailable',s?dm(s.date):'Unavailable',''])],
+    ['Credit spreads',list(credit.map(c=>c.name+' '+fmt(c.latestBp,0)+' bp')),list(credit.map(c=>'1M '+(c.change30Bp>0?'+':'')+fmt(c.change30Bp,0)+' bp')),list(credit.map(c=>dm(c.date)))]
   ],'r24-conditions-table');
 }
 function r24Snapshot(){

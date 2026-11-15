@@ -99,3 +99,18 @@
 
 .rd-note-btn::before{content:'i'}
 #workspace-stage table thead th{white-space:nowrap}
+
+/* Overview: visit-marker line removed. */
+#news-visit-controls{display:none!important}
+/* Company research and ETF tiles take the shared palette. */
+#workspace-stage .research-stat .lab,#workspace-stage .etf-stat .k{color:var(--t3-head)}
+#workspace-stage .research-stat .val{color:var(--t3-key)}
+#workspace-stage .research-stat .val.rd-pos{color:var(--up,#4ade80)}
+#workspace-stage .research-stat .val.rd-neg{color:var(--down,#ff7078)}
+#workspace-stage .rd-amber{color:var(--amber,#ffa028)!important}
+/* Pulse yield lines */
+#workspace-stage #market-pulse .mini.rd-pos{color:var(--up,#4ade80)!important}
+#workspace-stage #market-pulse .mini.rd-neg{color:var(--down,#ff7078)!important}
+#etf-diff-box{margin-top:14px}
+#etf-diff-box h3{margin:0 0 6px}
+.r24-conditions-table .rd-pos,.r26-conditions .rd-pos{color:var(--up,#4ade80)}.r24-conditions-table .rd-neg,.r26-conditions .rd-neg{color:var(--down,#ff7078)}

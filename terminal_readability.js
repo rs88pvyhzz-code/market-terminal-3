@@ -216,6 +216,38 @@
     });
   }
 
+
+  // Terminal 3: pulse yields in colour, tile figures signed, dates without year or time on condition tables.
+  function t3colour(){
+    document.querySelectorAll('#market-pulse .r24-snapshot-item .mini').forEach(m=>{
+      const t=m.textContent.replace('−','-');const mm=t.match(/^([+\-]?\d+(?:\.\d+)?) bp since/);if(!mm)return;
+      const v=parseFloat(mm[1]);m.classList.toggle('rd-pos',v>0);m.classList.toggle('rd-neg',v<0);
+      const short=m.textContent.replace(/ (\d{1,2} [A-Z][a-z]{2}) \d{4}/g,' $1');if(short!==m.textContent)m.textContent=short;
+    });
+    document.querySelectorAll('#workspace-stage .research-stat .val').forEach(v=>{
+      const t=v.textContent.trim().replace('−','-');
+      v.classList.toggle('rd-neg',/^-\d/.test(t)&&/%$/.test(t));v.classList.toggle('rd-pos',/^\+\d/.test(t)&&/%$/.test(t));
+    });
+    document.querySelectorAll('#workspace-stage h3,#workspace-stage h4,#workspace-stage .research-group-title,#workspace-stage summary').forEach(h=>{
+      if(/^(Price & valuation|Size & growth|Profitability|Cash & balance sheet)$/i.test(h.textContent.trim()))h.classList.add('rd-amber')});
+    document.querySelectorAll('#workspace-stage table').forEach(table=>{
+      const hr=table.tHead&&table.tHead.rows.length?table.tHead.rows[table.tHead.rows.length-1]:null;if(!hr)return;
+      const cond=table.classList.contains('r24-conditions-table')||table.classList.contains('r26-conditions');
+      [...hr.cells].forEach((h,i)=>{
+        if(!/^(observation date|date)( \(utc\))?$/i.test(h.textContent.trim().replace(/\s+/g,' ')))return;
+        if(!cond)return;
+        if(h.textContent.trim()!=='Date')h.textContent='Date';
+        for(const tb of table.tBodies)for(const row of tb.rows){const c=row.cells[i];if(!c)continue;
+          c.querySelectorAll('div').forEach(d=>{if(!d.children.length)fix(d)});if(!c.querySelector('div'))fix(c)}
+      });
+      if(cond)for(const tb of table.tBodies)for(const row of tb.rows)for(const c of row.cells)(c.querySelectorAll('div').length?c.querySelectorAll('div'):[c]).forEach(d=>{if(!d.children.length)fix(d)});
+    });
+    document.querySelectorAll('.r24-conditions-table .r24-line,.r26-conditions td').forEach(d=>{
+      if(d.children.length)return;const t=d.textContent.trim().replace('−','-');
+      if(/^[+\-]?\d+(?:\.\d+)?\s?(bp|%)/.test(t)||/^1M [+\-]?\d/.test(t)){const v=parseFloat(t.replace(/^1M /,''));d.classList.toggle('rd-pos',v>0);d.classList.toggle('rd-neg',v<0)}});
+    function fix(n){const v=n.textContent.replace(/(\d{1,2} [A-Z][a-z]{2}) \d{4}(?:,? \d{2}:\d{2})?(?: UTC)?/g,'$1');if(v!==n.textContent)n.textContent=v}
+  }
+
   let busy=false,queued=false;
   function apply(){
     if(busy)return;busy=true;
@@ -223,7 +255,7 @@
       header();pulse();
       document.querySelectorAll('#workspace-stage table').forEach(tableUtc);
       hideCols();orphans();priors();
-      document.querySelectorAll('#workspace-stage table tbody').forEach(datesIn);econDates();classify();currency();align();tone();slim();
+      document.querySelectorAll('#workspace-stage table tbody').forEach(datesIn);econDates();classify();currency();t3colour();align();tone();slim();
     }catch(e){console.warn('readability layer',e)}
     busy=false;
   }

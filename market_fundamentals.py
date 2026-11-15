@@ -93,19 +93,22 @@ def previous_site_snapshot():
     if '/' not in repo:return {}
     owner,name=repo.split('/',1)
     base=f'https://{owner}.github.io/{name}/'
-    url=base+'fundamentals_cache.json'
-    try:
-        request=urllib.request.Request(url,headers={
-            'User-Agent':'PersonalMarketResearch/1.1',
-            'Cache-Control':'no-cache',
-            'Accept':'application/json'})
-        with urllib.request.urlopen(request,timeout=18) as response:
-            payload=json.loads(response.read(15_000_000).decode('utf-8'))
-        if isinstance(payload,dict) and isinstance(payload.get('records'),dict) and isinstance(payload.get('attempts'),dict):
-            return payload
-    except Exception as exc:
-        # Initial migration: existing page won't have a separate cache file.
-        print('Fundamental cache: standalone file unavailable; checking previous site snapshot ('+str(exc)[:90]+')',flush=True)
+    best=None
+    # A new repository starts empty; seed it from the sibling Terminal 2 site until it has its own history.
+    for url in (base+'fundamentals_cache.json','https://rs88pvyhzz-code.github.io/market-terminal-2/fundamentals_cache.json'):
+        try:
+            request=urllib.request.Request(url,headers={
+                'User-Agent':'PersonalMarketResearch/1.1',
+                'Cache-Control':'no-cache',
+                'Accept':'application/json'})
+            with urllib.request.urlopen(request,timeout=18) as response:
+                payload=json.loads(response.read(15_000_000).decode('utf-8'))
+            if isinstance(payload,dict) and isinstance(payload.get('records'),dict) and isinstance(payload.get('attempts'),dict) and payload['records']:
+                print('Fundamental cache: '+str(len(payload['records']))+' summaries at '+url,flush=True)
+                if len(payload['records'])>len((best or {}).get('records',{})):best=payload
+        except Exception as exc:
+            print('Fundamental cache: '+url+' unavailable ('+str(exc)[:90]+')',flush=True)
+    if best:return best
 
     # One-time fallback for previously published builds. The large HTML may be
     # truncated by size or a CDN during the transition; failures must be clear.

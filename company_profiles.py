@@ -30,16 +30,19 @@ def _restore_published(filename=CACHE_NAME):
     if '/' not in repo:
         return {}
     owner, name = repo.split('/', 1)
-    url = f'https://{owner}.github.io/{name}/{filename}'
-    try:
-        req = urllib.request.Request(url, headers={'User-Agent': 'PersonalMarketResearch/1.1',
-                                                   'Cache-Control': 'no-cache'})
-        with urllib.request.urlopen(req, timeout=18) as r:
-            data = json.loads(r.read(20_000_000).decode('utf-8'))
-        return data if isinstance(data, dict) else {}
-    except Exception as exc:
-        print('Company profiles: no published cache yet (' + str(exc)[:80] + ')', flush=True)
-        return {}
+    best = {}
+    for url in (f'https://{owner}.github.io/{name}/{filename}',
+                f'https://rs88pvyhzz-code.github.io/market-terminal-2/{filename}'):
+        try:
+            req = urllib.request.Request(url, headers={'User-Agent': 'PersonalMarketResearch/1.1',
+                                                       'Cache-Control': 'no-cache'})
+            with urllib.request.urlopen(req, timeout=18) as r:
+                data = json.loads(r.read(20_000_000).decode('utf-8'))
+            if isinstance(data, dict) and len(data) > len(best):
+                best = data
+        except Exception as exc:
+            print('Company profiles: no published cache at ' + url + ' (' + str(exc)[:80] + ')', flush=True)
+    return best
 
 
 def universe(movers, fundamentals, top_us=US_TOP_N):

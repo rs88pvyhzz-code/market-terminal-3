@@ -7,7 +7,7 @@ Quoted prices are *not* live/executable broker bids/asks. No synthetic prices.
 from html.parser import HTMLParser
 from pathlib import Path
 import datetime as dt
-import json,time
+import csv,io,json,time
 import math
 import re
 import urllib.parse
@@ -131,6 +131,25 @@ def parse_html(content,asof=None):
     return accept_rows(out,asof)
 
 
+DETAIL_URL='https://www.treasurydirect.gov/GA-FI/FedInvest/securityPriceDetail'
+
+def parse_dated_csv(content,day,asof=None):
+    txt=content.decode('utf-8-sig','replace') if isinstance(content,bytes) else content
+    if txt.lstrip().startswith('<'):
+        return parse_html(txt,asof)
+    rows=[]
+    for r in csv.DictReader(io.StringIO(txt)):
+        r={str(k or '').strip().upper():(v or '').strip() for k,v in r.items()}
+        if re.fullmatch(r'[0-9A-Z]{9}',r.get('CUSIP',''),re.I):
+            r['DATE']=day.isoformat();rows.append(r)
+    return accept_rows(rows,asof)
+
+def fetch_dated(day,asof):
+    q=urllib.parse.urlencode({'priceDateDay':day.day,'priceDateMonth':day.month,'priceDateYear':day.year,
+                              'fileType':'csv','csv':'CSV FORMAT'})
+    return parse_dated_csv(api_get(DETAIL_URL+'?'+q,tries=2,timeout=40),day,asof)
+
+
 def parse_json(blob,asof=None):
     obj=json.loads(blob)
     rows=obj.get('data') if isinstance(obj,dict) else obj
@@ -197,6 +216,17 @@ def collect(core,opts):
                 result=parse_html(raw,today);used_cache+=int(cached)
                 for r in result[0]:r['source']=TODAY_PAGE
             except Exception as e:warnings.append('US Treasury current-price HTML: '+str(e)[:120])
+    if not opts.offline and result is None:
+        # "Today's prices" is empty at weekends; ask TreasuryDirect for each recent business day instead.
+        d=today
+        for _ in range(8):
+            if d.weekday()<5:
+                try:
+                    result=fetch_dated(d,today)
+                    for r in result[0]:r['source']=DETAIL_URL
+                    break
+                except Exception as e:warnings.append('US Treasury TreasuryDirect '+d.isoformat()+': '+str(e)[:90])
+            d-=dt.timedelta(days=1)
     # Previous published quotations retain their original date; NEVER re-label as current.
     if result is None:
         saved=prior_file(LATEST,PUBLIC_LATEST)
