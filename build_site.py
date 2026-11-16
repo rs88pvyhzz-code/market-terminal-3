@@ -36,6 +36,8 @@ POLISH_CSS = 'terminal_polish.css'
 POLISH_JS = 'terminal_polish.js'
 READABILITY_CSS = 'terminal_readability.css'
 READABILITY_JS = 'terminal_readability.js'
+SEMANTIC_CSS = 'terminal_semantic_colours.css'
+SEMANTIC_JS = 'terminal_semantic_colours.js'
 NEWS_JS = 'news_freshness.js'
 NEWS_SCRIPT_ID = 'news-freshness'
 
@@ -149,8 +151,8 @@ def inject_layout(html_path):
         if html.count(marker) != 1:
             raise SystemExit(f'Layout {label} insertion point found {html.count(marker)} times (expected 1): {marker!r}')
     # Polish follows the layout, and readability follows polish, so it has the last word on presentation.
-    css = '\n'.join((ROOT / f).read_text('utf-8') for f in (LAYOUT_CSS, POLISH_CSS, READABILITY_CSS))
-    js = '\n'.join((ROOT / f).read_text('utf-8') for f in (LAYOUT_JS, POLISH_JS, READABILITY_JS))
+    css = '\n'.join((ROOT / f).read_text('utf-8') for f in (LAYOUT_CSS, POLISH_CSS, READABILITY_CSS, SEMANTIC_CSS))
+    js = '\n'.join((ROOT / f).read_text('utf-8') for f in (LAYOUT_JS, POLISH_JS, READABILITY_JS, SEMANTIC_JS))
     if '</script' in js.lower() or '</style' in css.lower():
         raise SystemExit('Layout assets must not contain closing script or style tags.')
     # News freshness runs on the snapshot data before the application reads it.
