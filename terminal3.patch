@@ -1,0 +1,358 @@
+diff --git a/.github/workflows/compact-layout.yml b/.github/workflows/compact-layout.yml
+index 338d8d1..10221a1 100644
+--- a/.github/workflows/compact-layout.yml
++++ b/.github/workflows/compact-layout.yml
+@@ -29,18 +29,28 @@ jobs:
+         run: python build_site.py --demo --output /tmp/compact-demo.html
+       - name: Compact presentation and retained layout checks
+         run: |
++          python tests/browser_terminal3.py /tmp/compact-demo.html
+           python tests/browser_compact.py /tmp/compact-demo.html
+           python tests/browser_market_tables.py /tmp/compact-demo.html
+           python tests/browser_layout.py /tmp/compact-demo.html
+           python tests/browser_release212.py /tmp/compact-demo.html
+           python tests/browser_release22.py /tmp/compact-demo.html
+-      - name: Load existing production snapshot for visual regression
+-        uses: actions/download-artifact@v4
+-        with:
+-          github-token: ${{ github.token }}
+-          run-id: 43328200450
+-          name: actual-terminal-source-verification
+-          path: /tmp/archived-production
++      - name: Load this repository's published production snapshot
++        env:
++          SNAPSHOT_REPOSITORY: ${{ github.repository }}
++        run: |
++          python - <<'PYCODE'
++          import os, pathlib, urllib.request
++          owner, repo = os.environ['SNAPSHOT_REPOSITORY'].split('/', 1)
++          url = f'https://{owner}.github.io/{repo}/'
++          with urllib.request.urlopen(url, timeout=60) as response:
++              data = response.read(100_000_001)
++          if len(data) > 100_000_000:
++              raise SystemExit('Published snapshot exceeds size limit')
++          folder = pathlib.Path('/tmp/archived-production')
++          folder.mkdir(exist_ok=True)
++          (folder / 'terminal.html').write_bytes(data)
++          PYCODE
+       - name: Verify current layout against unchanged production data
+         run: |
+           python tests/rebuild_snapshot.py /tmp/archived-production /tmp/compact-production.html
+diff --git a/browser_release27.py b/browser_release27.py
+index ac64822..f6dfda0 100644
+--- a/browser_release27.py
++++ b/browser_release27.py
+@@ -48,7 +48,7 @@ with sync_playwright() as p:
+     page.goto('http://localhost:8765/',wait_until='domcontentloaded',timeout=120000);page.locator('#tab-etfs').dispatch_event('click');page.wait_for_timeout(100)
+     assert page.locator('#workspace-tabs [role=tab]').count()==10
+     assert len(data['etfTracker']['funds'])==132
+-    assert page.locator('.etf-table thead th').all_text_contents()==['Fund / ticker','TER','P/S','Fund size','1Y','3Y','5Y','Cmp']
++    assert page.locator('.etf-table thead th').all_text_contents()==['Fund / ticker','TER','P/S','Fund size','1D','1M','1Y','3Y','5Y','Cmp']
+     assert page.locator('#etf-r26-pick,#etf-selected-comparisons').count()==0
+     assert page.locator('#etf-same-index .etf-compare-card').count()<=3
+     reference_disclosure=page.locator('#etf-tracker-panel [aria-label="US domiciled bond ETF references"] details')
+diff --git a/company_profiles.py b/company_profiles.py
+index b6f5160..e512fee 100644
+--- a/company_profiles.py
++++ b/company_profiles.py
+@@ -32,7 +32,7 @@ def _restore_published(filename=CACHE_NAME):
+     owner, name = repo.split('/', 1)
+     best = {}
+     for url in (f'https://{owner}.github.io/{name}/{filename}',
+-                f'https://rs88pvyhzz-code.github.io/market-terminal-2/{filename}'):
++                f'https://rs88pvyhzz-code.github.io/Market-terminal-2/{filename}'):
+         try:
+             req = urllib.request.Request(url, headers={'User-Agent': 'PersonalMarketResearch/1.1',
+                                                        'Cache-Control': 'no-cache'})
+diff --git a/market_fundamentals.py b/market_fundamentals.py
+index 33418a0..8822fe4 100644
+--- a/market_fundamentals.py
++++ b/market_fundamentals.py
+@@ -95,7 +95,7 @@ def previous_site_snapshot():
+     base=f'https://{owner}.github.io/{name}/'
+     best=None
+     # A new repository starts empty; seed it from the sibling Terminal 2 site until it has its own history.
+-    for url in (base+'fundamentals_cache.json','https://rs88pvyhzz-code.github.io/market-terminal-2/fundamentals_cache.json'):
++    for url in (base+'fundamentals_cache.json','https://rs88pvyhzz-code.github.io/Market-terminal-2/fundamentals_cache.json'):
+         try:
+             request=urllib.request.Request(url,headers={
+                 'User-Agent':'PersonalMarketResearch/1.1',
+diff --git a/terminal_polish.css b/terminal_polish.css
+index b0d7b78..925c2f4 100644
+--- a/terminal_polish.css
++++ b/terminal_polish.css
+@@ -103,7 +103,7 @@ details.period-dates .time-box{margin-top:7px}
+ }
+ 
+ /* 12. No fund comparison: Cmp column, compare ticks and the clear button are gone. */
+-#etf-tracker-panel .etf-table :is(th,td):nth-child(8){display:none!important}
++/* All return periods and the comparison control remain visible. */
+ #etf-tracker-panel .etf-card-actions label,#etf-clear-comparisons,#etf-selected-comparisons{display:none!important}
+ .polish-retained{font:11px var(--font,ui-monospace,monospace);color:#f3bd6c}
+ 
+diff --git a/terminal_polish.js b/terminal_polish.js
+index 4db61c6..75be2a7 100644
+--- a/terminal_polish.js
++++ b/terminal_polish.js
+@@ -198,6 +198,11 @@
+   const active=new Set();
+   for(const table of stage.querySelectorAll('table')){
+    const head=table.tHead;if(!head||!head.rows.length||!table.getClientRects().length)continue;
++   // Closed research registers still have layout boxes in some browsers.
++   // Their headings must never float above the selected fund's chart.
++   let closed=false;
++   for(let p=table.parentElement;p;p=p.parentElement){if(p.tagName==='DETAILS'&&!p.open){closed=true;break;}}
++   if(closed||!table.tBodies.length||![...table.tBodies].some(b=>b.rows.length&&b.getBoundingClientRect().bottom>top))continue;
+    const rect=table.getBoundingClientRect(),height=head.getBoundingClientRect().height;
+    if(rect.top>=top||rect.bottom<=top+height||!height)continue;
+    let left=Math.max(0,rect.left),right=Math.min(innerWidth,rect.right);
+diff --git a/terminal_readability.css b/terminal_readability.css
+index 67d3202..25f9533 100644
+--- a/terminal_readability.css
++++ b/terminal_readability.css
+@@ -114,3 +114,19 @@
+ #etf-diff-box{margin-top:14px}
+ #etf-diff-box h3{margin:0 0 6px}
+ .r24-conditions-table .rd-pos,.r26-conditions .rd-pos{color:var(--up,#4ade80)}.r24-conditions-table .rd-neg,.r26-conditions .rd-neg{color:var(--down,#ff7078)}
++
++/* Terminal 3 refinement: clear hierarchy, one palette, all ETF periods. */
++#workspace-stage #etf-tracker-panel .etf-table :is(th,td){display:table-cell!important}
++#workspace-stage #etf-tracker-panel .etf-table{min-width:1120px!important}
++#workspace-stage #etf-tracker-panel .etf-table-scroll{overflow-x:auto!important}
++#workspace-stage .etf-stat .k,#workspace-stage .research-stat .lab{color:var(--t3-head)!important;font-weight:600}
++#workspace-stage .etf-stat .v,#workspace-stage .research-stat .val{color:var(--t3-key)!important;font-variant-numeric:tabular-nums}
++#workspace-stage .etf-stat .v.rd-pos,#workspace-stage .research-stat .val.rd-pos{color:var(--up,#4ade80)!important}
++#workspace-stage .etf-stat .v.rd-neg,#workspace-stage .research-stat .val.rd-neg{color:var(--down,#ff7078)!important}
++#workspace-stage .rd-key-metric{background:#142333!important;border-top:2px solid #527a99!important}
++#workspace-stage .etf-stat .d,#workspace-stage .research-stat .sub{color:#b8c3d1!important;font-size:12px!important;line-height:1.5}
++#workspace-stage .etf-stat-grid{overflow:hidden;border-color:#384655!important}
++#workspace-stage .etf-stat .v{font-size:23px!important;line-height:1.35;font-weight:600}
++#workspace-stage summary{color:#f0b35a;font-weight:600;line-height:1.5}
++#workspace-stage :is(button,a,input,select):focus-visible{outline:2px solid #7cc4ff!important;outline-offset:3px}
++.table-reading-head th{background:#202d3b!important;color:#f0b35a!important}
+diff --git a/terminal_readability.js b/terminal_readability.js
+index e0df48d..e2cb3c0 100644
+--- a/terminal_readability.js
++++ b/terminal_readability.js
+@@ -150,6 +150,18 @@
+   }
+ 
+ 
++  function metricColours(){
++    document.querySelectorAll('#workspace-stage .etf-stat,#workspace-stage .research-stat').forEach(tile=>{
++      const label=tile.querySelector('.k,.lab'), value=tile.querySelector('.v,.val');if(!label||!value)return;
++      const key=label.textContent.trim(),text=value.textContent.trim().replace('−','-');
++      const returns=/return|annualised|annualized|price move|drawdown/i.test(key)&&!/volatility|tracking|dispersion/i.test(key);
++      const number=/^[+\-]?\d+(?:\.\d+)?%$/.test(text)?parseFloat(text):null;
++      value.classList.toggle('rd-pos',returns&&number!==null&&number>0);
++      value.classList.toggle('rd-neg',returns&&number!==null&&number<0);
++      tile.classList.toggle('rd-key-metric',returns);
++    });
++  }
++
+   // ---- Terminal 3 additions ----
+   // Currency: $ £ € symbols, never "USD 12.3bn" / "GBp".
+   const SYM={USD:'$',GBP:'£',EUR:'€',JPY:'¥'};
+@@ -163,7 +175,7 @@
+       if(n.parentElement.closest('input,select,textarea,script,style,option'))continue;todo.push(n)}
+     todo.forEach(n=>{let v=n.nodeValue;
+       v=v.replace(RE1,(m,c,x)=>SYM[c]+x.replace(/\s/g,'')).replace(RE2,(m,pre,x,c)=>pre+SYM[c]+x.replace(/\s/g,''));
+-      v=v.replace(/\bGBp\b/g,'GBP');
++      // Do not relabel pence as pounds without converting the numeric value.
+       if(v!==n.nodeValue)n.nodeValue=v});
+   }
+   // Header follows its column: numeric columns right-aligned, text columns left.
+@@ -255,7 +267,7 @@
+       header();pulse();
+       document.querySelectorAll('#workspace-stage table').forEach(tableUtc);
+       hideCols();orphans();priors();
+-      document.querySelectorAll('#workspace-stage table tbody').forEach(datesIn);econDates();classify();currency();t3colour();align();tone();slim();
++      document.querySelectorAll('#workspace-stage table tbody').forEach(datesIn);econDates();classify();currency();t3colour();metricColours();align();tone();slim();
+     }catch(e){console.warn('readability layer',e)}
+     busy=false;
+   }
+diff --git a/test_terminal3_feeds.py b/test_terminal3_feeds.py
+new file mode 100644
+index 0000000..c2e6cb6
+--- /dev/null
++++ b/test_terminal3_feeds.py
+@@ -0,0 +1,43 @@
++"""Regression coverage for migration recovery and Treasury date-form changes."""
++import datetime as dt
++import unittest
++from unittest.mock import patch,MagicMock
++from urllib.parse import parse_qs
++import us_treasury_market as treasury
++
++class TreasuryFormTests(unittest.TestCase):
++    def test_public_form_posts_date_and_session_token(self):
++        form=b'<form id="fromToDate"><input name="priceDate" value="2026-11-13" value="11/13/26"><input name="_csrf" value="test-token"></form>'
++        opener=MagicMock()
++        opener.open.return_value.__enter__.return_value.read.side_effect=[form,b'quote table']
++        day=dt.date(2026,11,13)
++        with patch.object(treasury.urllib.request,'build_opener',return_value=opener),patch.object(treasury,'parse_html',return_value=([{}],day)):
++            rows,published=treasury.fetch_dated(None,dt.date(2026,11,16))
++        posted=opener.open.call_args_list[1].args[0]
++        self.assertEqual(posted.get_method(),'POST')
++        self.assertEqual(parse_qs(posted.data.decode())['priceDate'],['2026-11-13'])
++        self.assertEqual(parse_qs(posted.data.decode())['_csrf'],['test-token'])
++        self.assertEqual(published,day)
++        self.assertEqual(rows[0]['source'],treasury.DETAIL_URL)
++
++    def test_wrong_response_date_is_rejected(self):
++        opener=MagicMock()
++        opener.open.return_value.__enter__.return_value.read.side_effect=[b'<form id="fromToDate"><input name="_csrf" value="test-token"></form>',b'table']
++        with patch.object(treasury.urllib.request,'build_opener',return_value=opener),patch.object(treasury,'parse_html',return_value=([{}],dt.date(2026,11,12))):
++            with self.assertRaisesRegex(ValueError,'differs'):
++                treasury.fetch_dated(dt.date(2026,11,13),dt.date(2026,11,16))
++
++    def test_case_sensitive_recovery_after_missing_new_site(self):
++        path=MagicMock();path.exists.return_value=False
++        expected={'asOf':'2026-11-13','bonds':[{'cusip':'912797VX2'}]}
++        calls=[]
++        def response(url):
++            calls.append(url)
++            if '/Market-terminal-2/' in url:return expected
++            raise OSError('404')
++        with patch.object(treasury,'public_json',side_effect=response):
++            saved=treasury.prior_file(path,treasury.PUBLIC_LATEST)
++        self.assertEqual(saved,expected)
++        self.assertIn('/Market-terminal-2/',calls[-1])
++
++if __name__=='__main__':unittest.main()
+diff --git a/tests/browser_release27.py b/tests/browser_release27.py
+index cc63587..caab3cc 100644
+--- a/tests/browser_release27.py
++++ b/tests/browser_release27.py
+@@ -48,7 +48,7 @@ with sync_playwright() as p:
+     page.goto('http://localhost:8765/',wait_until='domcontentloaded',timeout=120000);page.locator('#tab-etfs').dispatch_event('click');page.wait_for_timeout(100)
+     assert page.locator('#workspace-tabs [role=tab]').count()==10
+     assert len(data['etfTracker']['funds'])==132
+-    assert page.locator('.etf-table thead th').all_text_contents()==['Fund / ticker','TER','P/S','Fund size','1Y','3Y','5Y','Cmp']
++    assert page.locator('.etf-table thead th').all_text_contents()==['Fund / ticker','TER','P/S','Fund size','1D','1M','1Y','3Y','5Y','Cmp']
+     assert page.locator('#etf-r26-pick,#etf-selected-comparisons').count()==0
+     assert page.locator('#etf-same-index .etf-compare-card').count()<=3
+     reference_disclosure=page.locator('#etf-tracker-panel [aria-label="US domiciled bond ETF references"] details')
+diff --git a/tests/browser_release29.py b/tests/browser_release29.py
+index 22f13a5..2a664ef 100644
+--- a/tests/browser_release29.py
++++ b/tests/browser_release29.py
+@@ -60,7 +60,7 @@ with sync_playwright() as p:
+         assert page.locator(selector).evaluate("(e)=>getComputedStyle(e).maxHeight==='none'&&e.scrollHeight<=e.clientHeight+2"),selector
+     assert page.locator("#gilt-freshness").count()==1
+     page.locator("#tab-etfs").click()
+-    assert page.locator("#etf-tracker-panel .etf-table thead th").count()==8
++    assert page.locator("#etf-tracker-panel .etf-table thead th").count()==10
+     assert page.locator("#etf-tracker-panel .etf-table-scroll").count()>=1
+     for width,height in [(1440,900),(1024,768),(390,844)]:
+         page.set_viewport_size({"width":width,"height":height})
+diff --git a/tests/browser_terminal3.py b/tests/browser_terminal3.py
+new file mode 100644
+index 0000000..b9bd27c
+--- /dev/null
++++ b/tests/browser_terminal3.py
+@@ -0,0 +1,31 @@
++"""Terminal 3: visible periods, semantic colours and closed-register headings."""
++import os,sys
++from pathlib import Path
++from playwright.sync_api import sync_playwright
++html=Path(sys.argv[1]).read_text()
++with sync_playwright() as p:
++    browser=p.chromium.launch(executable_path=os.environ.get('CHROMIUM_EXECUTABLE'),headless=True,args=['--no-sandbox'])
++    page=browser.new_page(viewport={'width':1366,'height':1024})
++    errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
++    page.route('http://localhost:8765/**',lambda r:r.fulfill(body=html,content_type='text/html'))
++    page.goto('http://localhost:8765/',wait_until='domcontentloaded',timeout=120000)
++    page.locator('#tab-etfs').dispatch_event('click');page.wait_for_timeout(500)
++    for name in ['1D','1M','1Y','3Y','5Y']:
++        head=page.locator('.etf-table thead th').filter(has_text=__import__('re').compile('^'+name+'$'))
++        assert head.count()==1 and head.is_visible(),name
++    assert page.locator('#etf-risk-stats .rd-key-metric').count()>=3
++    for value in page.locator('#etf-risk-stats .rd-key-metric .v').all():
++        text=value.inner_text().replace('−','-').strip()
++        try:n=float(text.rstrip('%'))
++        except ValueError:continue
++        if n>0:assert 'rd-pos' in value.get_attribute('class')
++        if n<0:assert 'rd-neg' in value.get_attribute('class')
++    # Closed reference tables cannot float their headers over the chart.
++    page.locator('#etf-chart').scroll_into_view_if_needed();page.wait_for_timeout(200)
++    floating=page.locator('.table-reading-head').all_text_contents()
++    assert not any('US ticker' in h and 'Issuer fund' in h for h in floating),floating
++    page.screenshot(path='/tmp/compact-terminal3-etf-detail.png')
++    page.evaluate('scrollTo(0,0)');page.screenshot(path='/tmp/compact-terminal3-etf-list.png')
++    assert not errors,errors
++    browser.close()
++print('PASS Terminal 3 periods, return colours and closed-reference headers')
+diff --git a/us_treasury_market.py b/us_treasury_market.py
+index 4e796e3..795312f 100644
+--- a/us_treasury_market.py
++++ b/us_treasury_market.py
+@@ -8,6 +8,7 @@ from html.parser import HTMLParser
+ from pathlib import Path
+ import datetime as dt
+ import csv,io,json,time
++import http.cookiejar
+ import math
+ import re
+ import urllib.parse
+@@ -144,10 +145,38 @@ def parse_dated_csv(content,day,asof=None):
+             r['DATE']=day.isoformat();rows.append(r)
+     return accept_rows(rows,asof)
+ 
++class PriceForm(HTMLParser):
++    def __init__(self):
++        super().__init__();self.fields={};self.active=False
++    def handle_starttag(self,tag,attrs):
++        # Treasury emits duplicate value attributes; browsers use the first.
++        attrs=dict(reversed(attrs))
++        if tag=='form':self.active=attrs.get('id')=='fromToDate'
++        if self.active and tag=='input' and attrs.get('name'):
++            self.fields[attrs['name']]=attrs.get('value','')
++    def handle_endtag(self,tag):
++        if tag=='form':self.active=False
++
++
+ def fetch_dated(day,asof):
+-    q=urllib.parse.urlencode({'priceDateDay':day.day,'priceDateMonth':day.month,'priceDateYear':day.year,
+-                              'fileType':'csv','csv':'CSV FORMAT'})
+-    return parse_dated_csv(api_get(DETAIL_URL+'?'+q,tries=2,timeout=40),day,asof)
++    # TreasuryDirect now uses a date input and a session-backed POST form.
++    # The old GET query returns the empty "today" page, not historic prices.
++    url='https://www.treasurydirect.gov/GA-FI/FedInvest/selectSecurityPriceDate'
++    opener=urllib.request.build_opener(urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
++    def read(request):
++        with opener.open(request,timeout=25) as response:raw=response.read(2_000_001)
++        if len(raw)>2_000_000:raise ValueError('Treasury price page exceeds bound')
++        return raw
++    form=PriceForm();form.feed(read(urllib.request.Request(url)).decode('utf-8','replace'))
++    requested=day or parse_date(form.fields.get('priceDate'))
++    if requested is None or requested>asof:raise ValueError('No valid Treasury quotation date in form')
++    if not form.fields.get('_csrf'):raise ValueError('Treasury date form token missing')
++    fields={**form.fields,'priceDate':requested.isoformat(),'submit':'Show Prices'}
++    raw=read(urllib.request.Request(url,data=urllib.parse.urlencode(fields).encode()))
++    rows,published=parse_html(raw,asof)
++    if published!=requested:raise ValueError('Treasury response date differs from requested date')
++    for row in rows:row['source']=DETAIL_URL
++    return rows,published
+ 
+ 
+ def parse_json(blob,asof=None):
+@@ -177,7 +206,7 @@ def public_json(url):
+ # The original site keeps its saved snapshot; a new repository falls back to it
+ # until it has published its own.
+ LEGACY_PAGES='https://rs88pvyhzz-code.github.io/market-terminal/'
+-SIBLING_PAGES='https://rs88pvyhzz-code.github.io/market-terminal-2/'
++SIBLING_PAGES='https://rs88pvyhzz-code.github.io/Market-terminal-2/'
+ 
+ def prior_file(path,url):
+     if path.exists():
+@@ -192,6 +221,9 @@ def prior_file(path,url):
+ def collect(core,opts):
+     warnings=[];used_cache=0;today=dt.datetime.now(dt.timezone.utc).date();result=None
+     if not opts.offline:
++        try:result=fetch_dated(None,today)
++        except Exception as e:warnings.append('US Treasury dated price form: '+str(e)[:120])
++    if not opts.offline and result is None:
+         # Fast path: find the latest quote date with a tiny query, then fetch only that day.
+         # The single large sorted query used to time out on the build runner.
+         for i,base in enumerate((BASE,BACKUP_API)):
