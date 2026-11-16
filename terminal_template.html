@@ -537,7 +537,7 @@ h2{font:600 15px/1.35 var(--font);color:var(--amber);margin:0}h3{font:500 13px v
     </section>
   </div>
   <details class="watchlist-advanced" id="watchlist-advanced"><summary>MORE FINANCIAL DATA — CASH FLOW, PROFITABILITY &amp; DEBT</summary><div class="watchlist-kpis" id="watchlist-extra-kpis"></div></details>
-  <p class="note" id="watchlist-source-warning">Prices and financial data can have different reporting dates and currencies. Dividend-adjusted prices are an unofficial proxy for total returns; figures are not a trading feed.</p>
+  <details class="research-detail source-provenance"><summary>Source dates, quote basis and limitations</summary><p class="note" id="watchlist-source-warning">Prices and financial data can have different reporting dates and currencies. Dividend-adjusted prices are an unofficial proxy for total returns; figures are not a trading feed.</p></details>
   <p class="note">This GitHub repository is public: the CSV discloses ticker names but never amounts held or position sizes. The saved list can be replaced at any time by editing <code>personal_watchlist.csv</code>.</p>
 </section>
 
@@ -706,7 +706,7 @@ h2{font:600 15px/1.35 var(--font);color:var(--amber);margin:0}h3{font:500 13px v
     <a id="company-source" class="company-link" target="_blank" rel="noopener noreferrer" href="https://finance.yahoo.com/">CHECK SOURCE QUOTE</a>
   </div>
     <div class="company-kpis" id="company-kpis"></div>
-  <div class="company-stat-note" id="company-dates">Price data and accounts may have different reporting dates and currencies.</div>
+  <details class="research-detail source-provenance" id="company-source-provenance"><summary>Source dates, currencies and methodology</summary><div class="company-stat-note" id="company-dates">Price data and accounts may have different reporting dates and currencies.</div></details>
   <div class="company-main">
     <div><div class="row"><h3>SHARE PRICE HISTORY</h3><span class="mini" id="company-price-date"></span></div><div class="period-controls" id="company-period"></div><p class="note" id="company-performance">Choose a time period.</p><div class="chart" id="company-chart"></div></div>
     <div class="company-fin"><h3>ANNUAL INCOME STATEMENT</h3><div id="company-annual"></div><p class="note" style="padding-top:9px">Revenue, operating profit and net profit are reported accounting figures, NOT necessarily trailing 12 months. All amounts use the company's financial reporting currency.</p></div>
