@@ -144,8 +144,10 @@ function renderWatchFreshness(){
  const signature=expected+'|'+stale.map(({w,q})=>w.symbol+':'+q?.asOf).join('|');if(host.dataset.signature===signature)return;host.dataset.signature=signature;
  host.replaceChildren(el('h2','','WATCHLIST QUOTE FRESHNESS'));
  host.append(el('p','note','Expected weekday close: '+expected+'. Weekends excluded; exchange holidays may also explain older quotes.'));
- if(!stale.length)host.append(el('p','','All watchlist quotes meet the weekday freshness check.'));
- for(const {w,q} of stale)host.append(el('p','',w.name+' · '+(q?.asOf?.slice(0,10)||'No dated quote')));
+ // Routine successful feeds require no confirmation panel.
+ host.hidden=!stale.length;
+ if(!stale.length){host.replaceChildren();return;}
+ for(const {w,q} of stale)host.append(el('p','research-warning',w.name+' · '+(q?.asOf?.slice(0,10)||'No dated quote')));
 }
 function orderDetailContent(){
  // The price table answers the first Markets question; history follows selection.
@@ -275,6 +277,30 @@ function mergeSnapshot(park){
   const reported=[...kpis.children].find(t=>/^return on equity$/i.test(t.firstElementChild?.textContent.trim()||''));
   if(calculated&&reported&&calculated.children[1]?.textContent!=='—'&&calculated.children[1]?.textContent===reported.children[1]?.textContent)reported.hidden=true;
   for(const tile of [...dash.children,...kpis.children]){const label=tile.firstElementChild&&tile.firstElementChild.textContent||'';tile.style.order=String(metricOrder(tile.dataset.metricLabel||label));}
+  // Show eight sourced headline metrics; leave all secondary figures and their
+  // calculators in the existing DOM. Users can expand without losing context.
+  const active=[...dash.children,...kpis.children].filter(t=>!t.hidden);
+  const primary=[/^price$/i,/^trailing p\/e/i,/^forward p\/e/i,/^dividend yield$/i,
+    /^revenue growth$/i,/^return on invested capital$|^calculated return on equity$|^return on equity$/i,
+    /^cash generation$/i,/^financial strength$/i];
+  const featured=[];
+  for(const test of primary){
+    const tile=active.find(t=>!featured.includes(t)&&test.test(t.firstElementChild?.textContent.trim()||''));
+    if(tile)featured.push(tile);
+  }
+  for(const tile of active.slice().sort((a,b)=>Number(a.style.order)-Number(b.style.order)))
+    if(featured.length<8&&!featured.includes(tile))featured.push(tile);
+  for(const tile of active)tile.classList.toggle('layout-secondary-metric',!featured.includes(tile));
+  let more=wrap.querySelector(':scope > .layout-more-metrics');
+  const remaining=active.length-featured.length;
+  if(remaining>0){
+    if(!more){more=document.createElement('button');more.type='button';more.className='btn layout-more-metrics';wrap.append(more);}
+    const refresh=()=>{const expanded=wrap.dataset.moreMetrics==='yes';
+      more.setAttribute('aria-expanded',String(expanded));
+      more.textContent=(expanded?'HIDE ':'SHOW ')+remaining+' ADDITIONAL METRICS';};
+    more.onclick=()=>{wrap.dataset.moreMetrics=wrap.dataset.moreMetrics==='yes'?'no':'yes';refresh();};
+    refresh();
+  }else more?.remove();
 
   if(holder&&!holder.contains(kpis)&&!park.contains(holder)){
     const rest=[...holder.children].filter(c=>!c.matches('h3,h4,summary,.r24-support-heading'));
@@ -813,11 +839,11 @@ setTimeout(applyLayout,150);
   const FILING=/\bSEC\b|EDGAR|XBRL|\b(?:10-K|10-Q|20-F|6-K|8-K)\b/;
   function scrubFilings(){
     const stage=document.getElementById('workspace-stage');if(!stage)return;
-    for(const a of stage.querySelectorAll('a[href*="sec.gov"]'))if(!a.closest('#view-quality'))a.remove();
+    for(const a of stage.querySelectorAll('a[href*="sec.gov"]'))if(!a.closest('#view-companies,#view-quality'))a.remove();
     for(const h of stage.querySelectorAll('summary,h3,h4,.r24-support-heading'))
-      if(/filing dates|Field-level sources/i.test(h.textContent)&&!h.closest('#view-quality')){const box=h.closest('details,section.r24-support')||h;box.hidden=true;}
+      if(/filing dates|Field-level sources/i.test(h.textContent)&&!h.closest('#view-companies,#view-quality')){const box=h.closest('details,section.r24-support')||h;box.hidden=true;}
     const walk=document.createTreeWalker(stage,NodeFilter.SHOW_TEXT);const hits=[];let n;
-    while(n=walk.nextNode())if(FILING.test(n.textContent)&&!n.parentElement.closest('#view-quality,script,style'))hits.push(n);
+    while(n=walk.nextNode())if(FILING.test(n.textContent)&&!n.parentElement.closest('#view-companies,#view-quality,script,style'))hits.push(n);
     for(const t of hits){
       const v=t.textContent.replace(/SEC issuer filings?/gi,'issuer accounts').replace(/\(?SEC XBRL\)?\s*/gi,'').replace(/SEC (?:EDGAR )?(?:filings?|companyfacts)/gi,'issuer accounts')
         .replace(/\b(?:EDGAR|XBRL)\b\s*/g,'').replace(/\b(?:10-K|10-Q|20-F|6-K|8-K)\b/g,'annual report').replace(/\bSEC\b\s*/g,'').replace(/\s{2,}/g,' ');
