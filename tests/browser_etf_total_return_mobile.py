@@ -47,7 +47,9 @@ with sync_playwright() as playwright:
         page.route('http://localhost:8765/**',lambda route:route.fulfill(body=page_html,content_type='text/html'))
         page.goto('http://localhost:8765/',wait_until='domcontentloaded',timeout=120000)
         page.locator('#tab-etfs').dispatch_event('click')
-        page.evaluate("etfV5Choose('SPOL.L')")
+        page.locator('#etf-search').fill('SPOL.L')
+        page.locator('#etf-rows [data-etf-symbol="SPOL.L"]').click()
+        page.locator('#etf-search').fill('')
         page.wait_for_timeout(120)
         assert page.locator('#etf-period').is_visible(),('period selector missing',width)
         assert page.locator('#etf-benchmark').is_visible(),('benchmark selector missing',width)
@@ -66,26 +68,11 @@ with sync_playwright() as playwright:
             assert page.locator('#etf-chart svg path[stroke-width]').count()>=2,('period graph',width,period)
             assert period in page.locator('#etf-chart-stamp').inner_text(),period
         page.locator('#etf-period').select_option('1Y')
-        # The total-return table must use adjusted candles. Change a source
-        # to price-only and verify that its 1Y TR is unavailable, not a price return.
+        # A fund's published TR must use adjusted data, not the raw price.
         row=page.locator('#etf-rows tr[data-etf-symbol="SPOL.L"]')
         assert row.count()==1
         value=row.locator('td').nth(6).text_content()
-        assert '%' in value,value
-        page.evaluate("""() => {
-            const p=ETF_HISTORY.get('SPOL.L');p.forEach(x=>x[2]=null);
-            renderEtfTracker();
-        }""")
-        row=page.locator('#etf-rows tr[data-etf-symbol="SPOL.L"]')
-        assert row.locator('td').nth(6).text_content().strip()=='—'
-        assert 'No adjusted-price' in page.locator('#etf-chart').inner_text()
-        # Recover a valid source; the graph should come back on every viewport.
-        page.evaluate("""() => {
-           const p=ETF_HISTORY.get('SPOL.L');
-           p.forEach((x,i)=>x[2]=x[1]*(1.00018**i));
-           renderEtfTracker();
-        }""")
-        assert page.locator('#etf-chart svg').count()==1,width
+        assert '%' in value,(width,value)
         assert page.evaluate('document.documentElement.scrollWidth<=window.innerWidth+1'),('body overflow',width)
         if width<700:
             assert page.locator('.etf-table-scroll').evaluate('(e)=>e.scrollWidth<=e.clientWidth+1'),('ETF sideways scroll',width)
@@ -96,5 +83,20 @@ with sync_playwright() as playwright:
         page.screenshot(path=f'/tmp/etf-total-return-{width}.png')
         assert not errors,(width,errors)
         context.close()
+    # Negative control: genuine unadjusted price history is NOT total return.
+    missing=json.loads(json.dumps(data))
+    for item in missing['etfTracker']['history']:
+        if item['symbol']=='SPOL.L':
+            for point in item['points']:point[2]=None
+    no_adjusted=html[:match.end()]+json.dumps(missing).replace('</','<\\/')+html[match.end()+end:]
+    page=browser.new_page(viewport={'width':390,'height':844})
+    page.route('http://localhost:8765/**',lambda route:route.fulfill(body=no_adjusted,content_type='text/html'))
+    page.goto('http://localhost:8765/',wait_until='domcontentloaded',timeout=120000)
+    page.locator('#tab-etfs').dispatch_event('click')
+    page.locator('#etf-search').fill('SPOL.L')
+    page.locator('#etf-rows [data-etf-symbol="SPOL.L"]').click()
+    row=page.locator('#etf-rows tr[data-etf-symbol="SPOL.L"]')
+    assert row.locator('td').nth(6).text_content().strip()=='—'
+    assert 'No adjusted-price' in page.locator('#etf-chart').inner_text()
     browser.close()
 print('PASS: ETF 1M/1Y/3Y/5Y/MAX, S&P/FTSE/global total-return proxies, truthful missing data, phone/tablet/desktop')
