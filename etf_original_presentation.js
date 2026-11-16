@@ -97,7 +97,7 @@ etfDetails=function(){
  }
  if(f.returnEndSource?.includes('after-close')){
    const chartNote=$('etf-chart-note');
-   if(chartNote&&etfState.basis.startsWith('adjusted'))chartNote.append(document.createTextNode(' Latest after-close quote has no matching adjusted-close candle: the table uses a dated price-only return; the adjusted-close chart may end on the prior trading day.'));
+   if(chartNote&&etfState.basis.startsWith('adjusted'))chartNote.append(document.createTextNode(' Latest after-close quote has no matching adjusted-close candle: the return chart stops at the last verified adjusted close and does not impute an intervening dividend.'));
  }
  const host=$('etf-issuer-snapshot');if(host){const sources=el('p','note'),seen=new Set([$('etf-facts-link')?.href,$('etf-quote-link')?.href]);
   for(const [label,url] of [['Issuer',f.issuerVerifiedUrl||f.officialFactsUrl],['TER source',f.terUrl],['Structure',f.structureSource],['Lending policy',f.lendingPolicySource]])if(url?.startsWith('https://')&&!seen.has(url)){seen.add(url);const a=el('a','',label);a.href=url;a.target='_blank';a.rel='noopener noreferrer';sources.append(a,document.createTextNode(' · '));}
@@ -127,7 +127,7 @@ function etfV5PickMain(){
   return {all,shown:all.filter(f=>keep.has(f.symbol)),suppressed:all.length-keep.size};
 }
 function etfShortMove(f,k){
-  try{const rows=etfRows(f,'MAX',etfState.basis);if(rows.length<2)return null;
+  try{const rows=etfRows(f,'MAX','adjusted_local');if(rows.length<2)return null;
     const last=rows[rows.length-1];let base=null;
     if(k==='1D')base=rows[rows.length-2];
     else{const c=new Date(last.date+'T12:00:00Z');c.setUTCMonth(c.getUTCMonth()-1);const t=c.toISOString().slice(0,10);
@@ -165,10 +165,12 @@ renderEtfTracker=function(){
     const aum=etfCell(row,etfFundSize(f),'n');aum.title=(f.fundSizeSource||'Fund AUM unverified')+(f.fundSizeAsOf?' · '+f.fundSizeAsOf:'');
     for(const y of ['1D','1M']){const v=etfShortMove(f,y);const c=etfCell(row,v==null?'—':etfPct(v),'n');c.title=y==='1D'?'Last close against previous close':'Last close against close one month earlier';}
     for(const y of ['1Y','3Y','5Y']){
-      const cell=etfCell(row,etfPct(f['return'+y]),'n'),period=f.returnPeriods?.[y];
-      cell.title=period ? y+' '+period.basis+': '+period.start+' to '+period.end+
-          ' · '+(f.returnEndSource||'Yahoo historical prices') :
-          y+' return unavailable: no sufficiently close dated anniversary observations';
+      // No silent fallback to price returns: only dated adjusted closing prices.
+      const value=etfPerformance(f,y,'adjusted_local');
+      const cell=etfCell(row,etfPct(value),'n');
+      cell.title=value==null?
+        y+' total return proxy unavailable: missing dated adjusted-close observations':
+        y+' dividend/split-adjusted close proxy in quoted currency'+(y==='1Y'?'':' (annualised)')+'. Not audited fund NAV.';
     }
     const cell=etfCell(row,'','etf-compact-compare');
     const check=el('input');check.type='checkbox';check.checked=f.symbol===etfState.selected||etfState.compared.has(f.symbol);check.disabled=f.symbol===etfState.selected||!etfOriginalPeers(ETF_BY_SYMBOL.get(etfState.selected)).some(p=>p.symbol===f.symbol);
@@ -177,7 +179,7 @@ renderEtfTracker=function(){
     frag.append(row);
   }
   tbody.replaceChildren(frag);etfViewport.scrollTop=savedTop;
-  const label=$('etf-result-count');if(label)label.textContent=shown.length+' mainstream funds · '+suppressed+' other funds in these markets · maximum two per market · ESG/climate funds excluded · 1Y period / 3Y & 5Y annualised';
+  const label=$('etf-result-count');if(label)label.textContent=shown.length+' mainstream funds · '+suppressed+' other funds in these markets · maximum two per market · ESG/climate funds excluded · total-return proxy: 1Y period / 3Y & 5Y annualised · missing —';
   // Older wrappers used a seven-column layout; these eight match the headers.
   // Duplicate checked-fund cards are deliberately not restored.
   renderSameIndexETFs();
