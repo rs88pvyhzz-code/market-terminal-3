@@ -70,6 +70,31 @@ function renderResearchOverview(c){
   researchCard(grid,'REVENUE GROWTH',pc(r.growth?.revenue),'YoY · '+(data.cagrPeriods?.revenue?.years||0)+'y CAGR '+pc(data.cagr?.revenue));
   researchCard(grid,'CASH GENERATION',fin?'Sector review':companyAmount(r.fcf,ccy),fin?'Generic corporate FCF excluded for financial companies.':'Calculated OCF − |capex| · conversion '+(Number.isFinite(r.cashConversion)?fmt(r.cashConversion,2)+'×':'—'));
   researchCard(grid,'Trailing P/E',c.trailingPE>0?fmt(c.trailingPE,1)+'×':'—','Observed provider ratio');
+ // Use observed price and adjusted-close histories side by side. The second
+ // basis is a provider total-return proxy, not an independently audited return.
+ const comparison=el('div','research-return-comparison');host.append(comparison);
+ if(typeof renderReturnBasisComparison==='function')renderReturnBasisComparison(c.symbol,comparison);
+ // Directly accessible, dated issuer documents. Never construct a filing URL
+ // from a ticker or show a link when provenance is not present.
+ const references=[];
+ for(const year of (data.annual||[]).slice(0,3)){
+   for(const item of Object.values(year.provenance||{})){
+     if(!item||!/^https:\/\/(?:www\.)?sec\.gov\//i.test(item.url||''))continue;
+     if(references.some(x=>x.url===item.url))continue;
+     references.push({url:item.url,period:year.fiscalEnd||'Period unavailable',filed:item.filed||''});
+   }
+ }
+ if(references.length){
+   const box=el('div','research-primary-sources');
+   box.append(el('strong','','PRIMARY-SOURCE DOCUMENTS'));
+   for(const doc of references.slice(0,3)){
+     const a=el('a','research-source','OPEN ISSUER FILING · '+doc.period);
+     a.href=doc.url;a.target='_blank';a.rel='noopener noreferrer';
+     a.title=doc.filed?'Filed '+doc.filed:'Dated fiscal period '+doc.period;
+     box.append(a);
+   }
+   host.append(box);
+ }
   host.append(el('p','note',`Accounts: ${r.fiscalEnd||'unavailable'} · ${ccy||'currency unknown'} · retrieved ${String(c.financialAsOf||'unknown').slice(0,10)}. Facts and calculated measures; no composite score or investment rating.`));
   const detail=researchDetails(host,'All reported snapshot metrics & source methodology');if(kpis)detail.append(kpis);
   const rules=researchDetails(host,'Dashboard rules');rules.append(el('p','note','Financial strength uses (reported debt − cash) / positive EBITDA; 3× is a visible screening threshold, not a sector rating. ROIC uses after-tax operating profit over average equity + debt − cash; ROE uses profit / average equity. Growth compares adjacent annual periods only. Cash conversion is operating cash flow / positive shareholder net profit. No missing value is treated as zero. Banks and insurers require regulatory measures not available from generic accounts.'));
