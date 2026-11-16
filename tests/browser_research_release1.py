@@ -43,7 +43,7 @@ with sync_playwright() as p:
         page.locator('#research-tab-0').click()
         assert page.locator('#research-overview .research-card').count()==7
         page.locator('#research-tab-1').click();page.wait_for_timeout(80)
-        assert '5 of 5 annual periods sourced' in page.locator('#research-statements').inner_text()
+        assert '5 of 5 annual periods sourced' in page.locator('#research-statements').text_content()  # methodology note may be folded behind i
         assert page.locator('#research-statements button',has_text='10Y').is_disabled()
         assert page.locator('#research-financial-chart svg').count()==1
         page.locator('#research-tab-2').click()
