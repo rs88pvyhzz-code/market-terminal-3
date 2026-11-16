@@ -264,7 +264,7 @@
       header();pulse();
       document.querySelectorAll('#workspace-stage table').forEach(tableUtc);
       hideCols();orphans();priors();
-      document.querySelectorAll('#workspace-stage table tbody').forEach(datesIn);econDates();classify();currency();t3colour();align();tone();slim();
+      document.querySelectorAll('#workspace-stage table tbody').forEach(datesIn);econDates();classify();currency();t3colour();align();tone();slim();t3SemanticColours();
     }catch(e){console.warn('readability layer',e)}
     busy=false;
   }
