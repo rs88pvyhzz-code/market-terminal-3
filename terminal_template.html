@@ -494,7 +494,7 @@ h2{font:600 15px/1.35 var(--font);color:var(--amber);margin:0}h3{font:500 13px v
   </div>
   <p class="note" id="watchlist-note" aria-live="polite"></p>
   <div class="watchlist-table-scroll"><table class="watch"><thead><tr>
-    <th>Security</th><th>Ticker</th><th class="n">Last price</th><th class="n">Day</th><th class="n">1M</th><th class="n">1Y</th><th class="n">3Y p.a.</th><th class="n">5Y p.a.</th><th class="n">Dividend</th>
+    <th>Security</th><th>Ticker</th><th class="n">Last price</th><th class="n">Day</th><th class="n">1M TR</th><th class="n">1Y TR</th><th class="n">3Y TR p.a.</th><th class="n">5Y TR p.a.</th><th class="n">Dividend</th>
   </tr></thead><tbody id="watchlist-rows"></tbody></table></div>
   <div class="watchlist-selected-header">
     <div><h3 id="watchlist-selected-name">Select a security</h3><p class="mini" id="watchlist-selected-meta"></p></div>
@@ -2232,18 +2232,25 @@ const watchlistRecords=Array.isArray(D.personalWatchlist)?D.personalWatchlist:[]
 const watchQuoteMap=new Map((D.watchlist_quotes||[]).map(q=>[q.symbol,q]));
 const watchHistoryMap=new Map((D.watchlist_history||[]).map(h=>[h.symbol,h.points||[]]));
 const watchNewsMap=new Map((D.watchlist_news||[]).map(n=>[n.symbol,n]));
-const watchState={symbol:watchlistRecords[0]?.symbol||'',query:'',kind:'all',sort:'original',range:'1Y',riskRange:'1Y',basis:'price_local'};
+const watchState={symbol:watchlistRecords[0]?.symbol||'',query:'',kind:'all',sort:'original',range:'1Y',riskRange:'1Y',basis:'adjusted_gbp'};
 const WATCH_RANGES=['1M','1Y','3Y','5Y','MAX'];
 function watchProfile(symbol){return companyMap.get(symbol)||fundamentalsMap.get(symbol)||null;}
 function watchFmtQuote(q){if(!q||q.price==null)return '—';const pence=['GBp','GBX'].includes(q.currency),price=q.price/(pence?100:1);return fmt(price,2)+' '+(pence?'GBP':q.currency||'');}
-function watchPeriodReturn(symbol,years){
- const rows=(watchHistoryMap.get(symbol)||[]).filter(x=>Number(x[1])>0).slice().sort((a,b)=>a[0].localeCompare(b[0]));
- if(rows.length<2)return null;const end=rows.at(-1),target=new Date(end[0]+'T12:00:00Z');
- if(years)target.setUTCFullYear(target.getUTCFullYear()-years);else target.setUTCMonth(target.getUTCMonth()-1);
+function watchPeriodReturn(symbol,years,basis='adjusted'){
+ // Require actual adjusted observations for total returns: never present the
+ // unadjusted price return as a dividend-inclusive return.
+ const column=basis==='price'?1:2;
+ const all=(watchHistoryMap.get(symbol)||[]).filter(x=>Array.isArray(x)&&/^\d{4}-\d{2}-\d{2}$/.test(x[0])&&Number(x[1])>0).slice().sort((a,b)=>a[0].localeCompare(b[0]));
+ if(all.length<2||!(Number(all.at(-1)[column])>0))return null;
+ const rows=all.filter(x=>Number(x[column])>0);
+ if(rows.length<2)return null;
+ const end=rows.at(-1),target=new Date(end[0]+'T12:00:00Z');
+ if(years)target.setUTCFullYear(target.getUTCFullYear()-years);
+ else target.setUTCMonth(target.getUTCMonth()-1);
  const start=rows.filter(x=>Date.parse(x[0]+'T12:00:00Z')<=target).at(-1);
  if(!start||target-Date.parse(start[0]+'T12:00:00Z')>7*86400000)return null;
- const days=(Date.parse(end[0])-Date.parse(start[0]))/86400000,gross=end[1]/start[1];
- return 100*((years?Math.pow(gross,365.25/days):gross)-1);
+ const days=(Date.parse(end[0])-Date.parse(start[0]))/86400000,gross=Number(end[column])/Number(start[column]);
+ return days>0&&gross>0?100*((years?Math.pow(gross,365.25/days):gross)-1):null;
 }
 function watchExpectedDate(now=new Date()){const d=new Date(now);d.setUTCDate(d.getUTCDate()-1);while([0,6].includes(d.getUTCDay()))d.setUTCDate(d.getUTCDate()-1);return d.toISOString().slice(0,10);}
 function watchRows(){let rows=watchlistRecords.filter(w=>(watchState.kind==='all'||w.assetType===watchState.kind)&&
@@ -2263,6 +2270,8 @@ const watchSpanDays=(a,b)=>(Date.parse(b+'T12:00:00Z')-Date.parse(a+'T12:00:00Z'
 function watchAligned(w,q,range='1Y',adjusted=false){
  const sym=w.benchmark||'',bench=qMap.get(sym),raw=histMap.get(sym)||[];
  if(!sym||!bench||raw.length<2)return {rows:[],bench,reason:'Reference index not available in this market snapshot.'};
+ if(adjusted&&!raw.some(p=>Number(p.adj)>0))
+   return {rows:[],bench,reason:'Benchmark total return unavailable. A price index cannot be compared with a dividend-adjusted return.'};
  const own=(watchHistoryMap.get(w.symbol)||[]).filter(r=>Array.isArray(r)&&r[1]>0)
    .map(r=>({date:r[0],v:adjusted?(r[2]??null):r[1]})).filter(r=>r.v>0).sort((a,b)=>a.date.localeCompare(b.date));
  if(own.length<2)return {rows:[],bench,reason:'Security price history is unavailable.'};
@@ -2273,7 +2282,7 @@ function watchAligned(w,q,range='1Y',adjusted=false){
  const sameCurrency=watchCurrency(q?.currency)===watchCurrency(bench.currency);
  const rows=[];
  for(const b of raw){if(!dates.has(b.date)||b.date<first||!(b.v>0))continue;
-  const a=dates.get(b.date);const bv=adjusted&&b.adj>0?b.adj:b.v;
+  const a=dates.get(b.date);const bv=adjusted?b.adj:b.v;
   const av=sameCurrency?a:priceToGBP(a,q?.currency||'',b.date);
   const indexv=sameCurrency?bv:priceToGBP(bv,bench.currency,b.date);
   if(av>0&&indexv>0)rows.push({date:b.date,a:av,b:indexv});
@@ -2512,14 +2521,14 @@ function watchValTile(label,value,info=''){
 }
 function renderWatchRows(){
  const body=$('watchlist-rows');body.replaceChildren();const rows=watchRows();
- $('watchlist-note').textContent=rows.length+' shown / '+watchlistRecords.length+' configured. Tap a security to see its chart, performance, financial data and sourced news. Missing figures are not estimated.';
+ $('watchlist-note').textContent=rows.length+' shown / '+watchlistRecords.length+' configured. 1M/1Y/3Y/5Y are dividend-adjusted total-return proxies in quoted currency (3Y/5Y annualised). Day is a price move. Missing adjusted data stay —.';
  for(const w of rows){const q=watchQuoteMap.get(w.symbol),f=watchProfile(w.symbol),tr=el('tr');
   tr.tabIndex=0;tr.setAttribute('role','button');tr.setAttribute('aria-label','Open research for '+w.name);
   if(watchState.symbol===w.symbol)tr.classList.add('selected');
   const pct=(value)=>value==null?'—':pc(value);
   const nameCell=td(tr,shortSecurityName(w.name));nameCell.title=w.name;td(tr,w.symbol);td(tr,watchFmtQuote(q),'n');
   td(tr,pct(q?.changePct),'n '+tone(q?.changePct));const month=watchPeriodReturn(w.symbol,0);td(tr,pct(month),'n '+tone(month));
-  td(tr,pct(q?.yearPct),'n '+tone(q?.yearPct));
+  const year=watchPeriodReturn(w.symbol,1);td(tr,pct(year),'n '+tone(year));
   for(const years of [3,5]){const v=watchPeriodReturn(w.symbol,years);td(tr,pct(v),'n '+tone(v));}td(tr,pct(f?.dividendYieldPct),'n');
   const date=q?.asOf?.slice(0,10);if(!date||date<watchExpectedDate()){const flag=el('span','mini down',' · '+(date?'Quote '+date:'Quote unavailable'));tr.cells[0].append(flag);}
   tr.onclick=()=>{watchState.symbol=w.symbol;renderWatchlist();};
@@ -2614,11 +2623,11 @@ function renderWatchlist(){
  const core=[
   ['LAST QUOTED PRICE',watchFmtQuote(q),q?.source||'No verified exchange quote'],
   ['DAILY PRICE MOVE',pc(q?.changePct),q?.asOf?.slice(0,10)||'No dated quote'],
-  ['ONE-MONTH PRICE RETURN',pc(watchPeriodReturn(w.symbol,0)),'Price only · local currency'],
-  ['ONE-YEAR PRICE RETURN',pc(q?.yearPct),'Price only · dividends excluded']
+  ['ONE-MONTH TOTAL RETURN',pc(watchPeriodReturn(w.symbol,0)),'Dividend-adjusted close proxy · quoted currency'],
+  ['ONE-YEAR TOTAL RETURN',pc(watchPeriodReturn(w.symbol,1)),'Dividend-adjusted close proxy · quoted currency']
  ];
  const riskMeasures=[
-  ['THREE-YEAR PRICE RETURN',pc(risk.threeYear),'Price only · quoted currency'],
+  ['THREE-YEAR TOTAL RETURN',pc(watchPeriodReturn(w.symbol,3)),'Annualised adjusted-close proxy · quoted currency'],
   ['ONE-YEAR VOLATILITY',pc(technical.volatility),'Daily log price returns · ≥120 observations'],
   ['MAX DRAWDOWN',pc(technical.drawdown),technical.drawdownLabel||'Observed closes'],
   ['52-WEEK HIGH',q?.high52==null?'—':watchFmtQuote({...q,price:q.high52}),'Quoted price units'],
