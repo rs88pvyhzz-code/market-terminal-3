@@ -15,8 +15,8 @@ import pathlib
 from collections import defaultdict
 
 REFERENCE = {'FTSE100': '^FTSE', 'FTSE250': '^FTMC', 'SP500': '^GSPC', 'NASDAQ100': 'QQQ'}
-LOOKBACKS = {'1M': 30, '3M': 90, '6M': 182, '1Y': 365}
-MIN_POINTS = {'1M': 10, '3M': 35, '6M': 70, '1Y': 140}
+LOOKBACKS = {'1W': 7, '1M': 30, '3M': 90, '6M': 182, '1Y': 365}
+MIN_POINTS = {'1W': 3, '1M': 10, '3M': 35, '6M': 70, '1Y': 140}
 SECTOR_NAMES = {
     'Technology': 'Information Technology',
     'Financial Services': 'Financials',
@@ -181,7 +181,26 @@ def build(movers, fundamentals, history_rows, cache_file, today=None):
                     'relativePp':round(sr-idx_return,3) if sr is not None and idx_return is not None else None,
                     'covered':len(vals)
                 }
-            sector_records.append({'sector':sector,'sectorMembers':len(syms),'periods':perf})
+            # Fixed, fully observed cohort: no filling missing daily prices.
+            dates=[day for day,_ in bp if day <= date and
+                   (safe_date(date)-safe_date(day)).days <= 365]
+            series=[]
+            if len(dates)>1:
+                members=[]
+                for sym in syms:
+                    points=history.get(sym,[])
+                    selected=[p for p in points if dates[0] <= p[0] <= dates[-1]]
+                    values=dict(selected)
+                    if all(day in values for day in dates) and not suspicious_gap(selected):
+                        members.append(values)
+                index=dict(bp)
+                if members:
+                    for day in dates:
+                        series.append({'date':day,
+                          'sector':round(100*sum(v[day]/v[dates[0]] for v in members)/len(members),6),
+                          'index':round(100*index[day]/index[dates[0]],6),
+                          'covered':len(members)})
+            sector_records.append({'sector':sector,'sectorMembers':len(syms),'periods':perf,'history':series})
         output_sectors.append({'id':mid,'name':market.get('name',mid),'date':date,'members':total,
           'sectorIdentified':sum(sectormembers.values()),
           'benchmark':benchmark,'referencePeriods':{k:None if v is None else round(v,3) for k,v in reference.items()},
