@@ -30,6 +30,7 @@ jobs:
       - name: Compact presentation and retained layout checks
         run: |
           python tests/browser_semantic_colours.py /tmp/compact-demo.html
+          python tests/browser_etf_total_return_mobile.py /tmp/compact-demo.html
           python tests/browser_terminal3.py /tmp/compact-demo.html
           python tests/browser_compact.py /tmp/compact-demo.html
           python tests/browser_market_tables.py /tmp/compact-demo.html
