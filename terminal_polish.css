@@ -102,8 +102,8 @@ details.period-dates .time-box{margin-top:7px}
   .r28-rating-legend{grid-template-columns:repeat(3,minmax(0,1fr))}
 }
 
-/* 12. No fund comparison: Cmp column, compare ticks and the clear button are gone. */
-#etf-tracker-panel .etf-table :is(th,td):nth-child(8){display:none!important}
+/* ETF comparison remains available; the ten-column table uses the final responsive rules.
+   Never hide column 8: in Terminal 3 that column is the 3Y return. */
 #etf-tracker-panel .etf-card-actions label,#etf-clear-comparisons,#etf-selected-comparisons{display:none!important}
 .polish-retained{font:11px var(--font,ui-monospace,monospace);color:#f3bd6c}
 
