@@ -94,8 +94,11 @@ def previous_site_snapshot():
     owner,name=repo.split('/',1)
     base=f'https://{owner}.github.io/{name}/'
     best=None
-    # A new repository starts empty; seed it from the sibling Terminal 2 site until it has its own history.
-    for url in (base+'fundamentals_cache.json','https://rs88pvyhzz-code.github.io/market-terminal-2/fundamentals_cache.json'):
+    # Seed Terminal 3 from Terminal 2 first, then combine with the newer Terminal 3 cache.
+    # GitHub Pages URLs are case-sensitive (Market-terminal-2, not market-terminal-2).
+    sibling=f'https://{owner}.github.io/Market-terminal-2/fundamentals_cache.json'
+    urls=(sibling,base+'fundamentals_cache.json') if name.lower()=='market-terminal-3' else (base+'fundamentals_cache.json',)
+    for url in urls:
         try:
             request=urllib.request.Request(url,headers={
                 'User-Agent':'PersonalMarketResearch/1.1',
@@ -105,7 +108,15 @@ def previous_site_snapshot():
                 payload=json.loads(response.read(15_000_000).decode('utf-8'))
             if isinstance(payload,dict) and isinstance(payload.get('records'),dict) and isinstance(payload.get('attempts'),dict) and payload['records']:
                 print('Fundamental cache: '+str(len(payload['records']))+' summaries at '+url,flush=True)
-                if len(payload['records'])>len((best or {}).get('records',{})):best=payload
+                if best is None: best={'records':{},'attempts':{}}
+                for symbol,new in payload['records'].items():
+                    if not isinstance(new,dict):continue
+                    old=best['records'].get(symbol)
+                    # Prefer complete verified fields, then the more recent observation.
+                    quality=lambda v:(sum(x is not None for k,x in v.items() if k not in ('symbol','name','asOf')),str(v.get('asOf') or ''))
+                    if not isinstance(old,dict) or quality(new)>=quality(old):best['records'][symbol]=new
+                for symbol,stamp in payload['attempts'].items():
+                    if str(stamp)>str(best['attempts'].get(symbol,'')):best['attempts'][symbol]=stamp
         except Exception as exc:
             print('Fundamental cache: '+url+' unavailable ('+str(exc)[:90]+')',flush=True)
     if best:return best

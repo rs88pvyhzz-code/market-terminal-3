@@ -302,8 +302,25 @@ def collect(companies,profiles,directory,news=None,offline=False,batch=6,fetcher
     stamp=asof or now_iso();records={}
     try:records=json.loads(path.read_text()).get('records',{})
     except (OSError,ValueError,AttributeError):pass
-    if not records and not offline:records=(_restore_published(CACHE_NAME).get('records') or {})
     records={s:r for s,r in records.items() if isinstance(r,dict)} if isinstance(records,dict) else {}
+    if not offline:
+        # A new Terminal 3 runner may already have a *partial* local research cache.
+        # "if not records" prevents recovery from Terminal 2 and permanently
+        # strands most primary-source research. Merge all published records instead.
+        published=(_restore_published(CACHE_NAME).get('records') or {})
+        for symbol,old in published.items():
+            if not isinstance(old,dict):continue
+            current=records.get(symbol)
+            old_docs=[d for d in (old.get('documents') or []) if isinstance(d,dict)]
+            current_docs=[d for d in ((current or {}).get('documents') or []) if isinstance(d,dict)]
+            if not current or len(old_docs)>len(current_docs):
+                records[symbol]=old
+            elif old_docs:
+                # Retain dated, nonduplicated primary evidence when both archives
+                # have useful documents. Never change original source dates.
+                seen={d.get('url') for d in current_docs}
+                extra=[d for d in old_docs if d.get('url') not in seen]
+                if extra:records[symbol]={**current,'documents':current_docs+extra}
     source=fetcher or PublicSources(root/'documents',offline=offline);all_companies=list(companies)+list(profiles)
     # Deduplicate; detail profiles take precedence without mutating existing finances.
     all_companies=list({c['symbol']:c for c in reversed(all_companies)}.values())

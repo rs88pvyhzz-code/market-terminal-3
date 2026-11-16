@@ -38,7 +38,7 @@ with sync_playwright() as p:
  if not data.get('demo'):page.screenshot(path='/tmp/release210-news-ipad.png',full_page=True)
  page.locator('#tab-etfs').dispatch_event('click')
  table=page.locator('#etf-tracker-panel .etf-table')
- assert table.locator('thead th').count()==8
+ assert table.locator('thead th').count()==10
  result=page.locator('#etf-rows [data-etf-symbol]').evaluate_all('''rows=>rows.map(r=>r.dataset.etfSymbol)''')
  catalogue={f['symbol']:f for f in data['etfTracker']['funds']}
  market=collections.Counter()

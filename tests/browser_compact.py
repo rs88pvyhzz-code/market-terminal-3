@@ -93,9 +93,10 @@ with sync_playwright() as p:
             page.wait_for_timeout(200)
             assert page.locator('#company-news-list .news-new').count()>0
             page.locator('#tab-overview').dispatch_event('click')
-            page.locator('#news-visit-controls button').click()
-            assert page.locator('.news-new').count()==0
-            page.locator('#news-visit-controls a').click()
+            # Terminal 3 intentionally removed the visit-marker controls.
+            # Test the remaining news highlighting and main Data Quality navigation.
+            assert not page.locator('#news-visit-controls').is_visible()
+            page.locator('#tab-quality').dispatch_event('click')
             assert page.locator('#view-quality').is_visible()
             page.locator('#tab-companies').dispatch_event('click');page.locator('#research-tab-0').click()
 

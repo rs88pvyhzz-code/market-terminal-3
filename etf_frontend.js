@@ -110,19 +110,22 @@ function etfDrawDifference(sets,primary,symbols){
   if(!box){box=document.createElement('div');box.id='etf-diff-box';
     box.innerHTML='<h3>DIFFERENCE VS SELECTED FUND (PERCENTAGE POINTS)</h3><div id="etf-diff-chart" class="chart"></div><div class="mt-table-scroll"><table class="watch" id="etf-diff-table"><thead><tr><th>Fund</th><th class="n">Latest gap</th><th class="n">1Y</th><th class="n">3Y</th><th class="n">5Y</th></tr></thead><tbody></tbody></table></div>';
     const anchor=document.getElementById('etf-chart-note');(anchor||document.getElementById('etf-chart')).after(box);}
-  const funds=symbols.slice(1).map(x=>ETF_BY_SYMBOL.get(x)).filter(Boolean);
-  const base=sets[0];
-  if(!funds.length||sets.length<2){box.style.display='none';return;}
+  // Compare only genuine selected funds. The optional benchmark reference is a
+  // separate series, and a peer without dated observations must be excluded.
+  const base=sets.find(s=>s.name===primary.symbol);
+  const peers=symbols.slice(1).map(symbol=>({fund:ETF_BY_SYMBOL.get(symbol),
+    set:sets.find(s=>s.name===symbol)})).filter(p=>p.fund&&p.set);
+  if(!base||!peers.length){box.style.display='none';return;}
   box.style.display='';
-  const diffs=sets.slice(1,1+funds.length).map((set,i)=>({name:funds[i].symbol+' − '+primary.symbol,color:set.color,
+  const diffs=peers.map(({fund,set})=>({name:fund.symbol+' − '+primary.symbol,color:set.color,
     pts:set.pts.map((p,j)=>({date:p.date,v:p.v-base.pts[j].v}))}));
   chart('etf-diff-chart',diffs,{height:200,format:v=>(v>0?'+':'')+fmt(v,2),aria:'Return difference versus the selected fund, percentage points'});
   const gap=(a,b)=>Number.isFinite(a)&&Number.isFinite(b)?(a-b>0?'+':'')+fmt(a-b,2)+' pp':'—';
   const tb=box.querySelector('tbody');tb.replaceChildren();
-  funds.forEach((f,i)=>{
+  peers.forEach(({fund},i)=>{
     const last=diffs[i].pts.at(-1)?.v;
     const tr=document.createElement('tr');
-    for(const [t,c] of [[f.name+' · '+f.symbol,''],[Number.isFinite(last)?(last>0?'+':'')+fmt(last,2)+' pp':'—','n'],[gap(f.return1Y,primary.return1Y),'n'],[gap(f.return3Y,primary.return3Y),'n'],[gap(f.return5Y,primary.return5Y),'n']]){
+    for(const [t,c] of [[fund.name+' · '+fund.symbol,''],[Number.isFinite(last)?(last>0?'+':'')+fmt(last,2)+' pp':'—','n'],[gap(fund.return1Y,primary.return1Y),'n'],[gap(fund.return3Y,primary.return3Y),'n'],[gap(fund.return5Y,primary.return5Y),'n']]){
       const td=document.createElement('td');td.textContent=t;if(c)td.className=c;tr.append(td);}
     tb.append(tr);
   });

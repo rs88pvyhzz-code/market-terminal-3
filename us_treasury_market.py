@@ -8,6 +8,7 @@ from html.parser import HTMLParser
 from pathlib import Path
 import datetime as dt
 import csv,io,json,time
+import http.cookiejar
 import math
 import re
 import urllib.parse
@@ -144,10 +145,38 @@ def parse_dated_csv(content,day,asof=None):
             r['DATE']=day.isoformat();rows.append(r)
     return accept_rows(rows,asof)
 
+class PriceForm(HTMLParser):
+    def __init__(self):
+        super().__init__();self.fields={};self.active=False
+    def handle_starttag(self,tag,attrs):
+        # When Treasury emits duplicate value attributes, browsers use the first.
+        attrs=dict(reversed(attrs))
+        if tag=='form':self.active=attrs.get('id')=='fromToDate'
+        if self.active and tag=='input' and attrs.get('name'):
+            self.fields[attrs['name']]=attrs.get('value','')
+    def handle_endtag(self,tag):
+        if tag=='form':self.active=False
+
+
 def fetch_dated(day,asof):
-    q=urllib.parse.urlencode({'priceDateDay':day.day,'priceDateMonth':day.month,'priceDateYear':day.year,
-                              'fileType':'csv','csv':'CSV FORMAT'})
-    return parse_dated_csv(api_get(DETAIL_URL+'?'+q,tries=2,timeout=40),day,asof)
+    # TreasuryDirect's dated quotation form requires its CSRF token and session
+    # cookie. An old-style GET returns an empty or incorrectly dated result.
+    url='https://www.treasurydirect.gov/GA-FI/FedInvest/selectSecurityPriceDate'
+    opener=urllib.request.build_opener(urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
+    def read(request):
+        with opener.open(request,timeout=30) as response:raw=response.read(2_000_001)
+        if len(raw)>2_000_000:raise ValueError('Treasury price page exceeds bound')
+        return raw
+    form=PriceForm();form.feed(read(urllib.request.Request(url)).decode('utf-8','replace'))
+    requested=day or parse_date(form.fields.get('priceDate'))
+    if requested is None or requested>asof:raise ValueError('No valid Treasury quotation date in form')
+    if not form.fields.get('_csrf'):raise ValueError('Treasury date form token missing')
+    fields={**form.fields,'priceDate':requested.isoformat(),'submit':'Show Prices'}
+    raw=read(urllib.request.Request(url,data=urllib.parse.urlencode(fields).encode()))
+    rows,published=parse_html(raw,asof)
+    if published!=requested:raise ValueError('Treasury response date differs from requested date')
+    for row in rows:row['source']=DETAIL_URL
+    return rows,published
 
 
 def parse_json(blob,asof=None):
@@ -177,7 +206,7 @@ def public_json(url):
 # The original site keeps its saved snapshot; a new repository falls back to it
 # until it has published its own.
 LEGACY_PAGES='https://rs88pvyhzz-code.github.io/market-terminal/'
-SIBLING_PAGES='https://rs88pvyhzz-code.github.io/market-terminal-2/'
+SIBLING_PAGES='https://rs88pvyhzz-code.github.io/Market-terminal-2/'
 
 def prior_file(path,url):
     if path.exists():

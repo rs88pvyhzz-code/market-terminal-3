@@ -46,7 +46,7 @@ with sync_playwright() as p:
         assert 'MANAGEMENT & EARNINGS INTELLIGENCE' in page.locator('#research-outlook').inner_text()
         if symbol=='SHEL.L':
             assert '$23-$25 billion' in page.locator('#research-outlook').inner_text()
-            assert '$24-$26 billion' in page.locator('#research-outlook').inner_text()
+            assert '$24-$26 billion' in page.locator('#research-outlook').text_content()  # archived guidance is collapsed by design
         if symbol=='HSBA.L':assert 'RoTE' in page.locator('#research-outlook').inner_text()
         for link in page.locator('#research-outlook a.research-source[href]').all():
             assert link.get_attribute('href').startswith('https://')

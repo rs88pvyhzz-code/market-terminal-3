@@ -29,21 +29,34 @@ jobs:
         run: python build_site.py --demo --output /tmp/compact-demo.html
       - name: Compact presentation and retained layout checks
         run: |
+          python tests/browser_terminal3.py /tmp/compact-demo.html
           python tests/browser_compact.py /tmp/compact-demo.html
           python tests/browser_market_tables.py /tmp/compact-demo.html
           python tests/browser_layout.py /tmp/compact-demo.html
           python tests/browser_release212.py /tmp/compact-demo.html
           python tests/browser_release22.py /tmp/compact-demo.html
-      - name: Load existing production snapshot for visual regression
-        uses: actions/download-artifact@v4
-        with:
-          github-token: ${{ github.token }}
-          run-id: 43328200450
-          name: actual-terminal-source-verification
-          path: /tmp/archived-production
+      - name: Load Terminal 3's own published snapshot for visual regression
+        env:
+          SNAPSHOT_REPOSITORY: ${{ github.repository }}
+        run: |
+          python - <<'PYCODE'
+          import os
+          from pathlib import Path
+          from urllib.request import urlopen
+          owner, repo = os.environ['SNAPSHOT_REPOSITORY'].split('/', 1)
+          url = f'https://{owner}.github.io/{repo}/'
+          with urlopen(url, timeout=60) as response:
+              content = response.read(100_000_001)
+          if len(content) > 100_000_000:
+              raise SystemExit('Published Terminal 3 snapshot too large')
+          destination=Path('/tmp/archived-production')
+          destination.mkdir(exist_ok=True)
+          (destination / 'terminal.html').write_bytes(content)
+          PYCODE
       - name: Verify current layout against unchanged production data
         run: |
           python tests/rebuild_snapshot.py /tmp/archived-production /tmp/compact-production.html
+          python tests/browser_terminal3.py /tmp/compact-production.html
           python tests/browser_compact.py /tmp/compact-production.html
           python tests/browser_market_tables.py /tmp/compact-production.html
           python tests/browser_layout.py /tmp/compact-production.html
