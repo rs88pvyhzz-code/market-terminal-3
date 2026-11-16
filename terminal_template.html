@@ -3674,7 +3674,7 @@ function etfV5Card(f,tag,withCheckbox=true){
   const metrics=el('div','etf-card-facts');
   const [code,kind]=etfV5Kind(f);
   const values=[['TER',etfFee(f)],['Structure',code+' · '+kind],['Fund AUM',etfFundSize(f)],
-                ['1Y',etfPct(f.return1Y)],['3Y',etfPct(f.return3Y)],['5Y',etfPct(f.return5Y)],
+                ['1Y TR',etfPct(etfPerformance(f,'1Y','adjusted_local'))],['3Y TR',etfPct(etfPerformance(f,'3Y','adjusted_local'))],['5Y TR',etfPct(etfPerformance(f,'5Y','adjusted_local'))],
                 ['3Y NAV TE',f.officialTrackingError3Y!=null?etfPct(f.officialTrackingError3Y):'—'],
                 ['Income',f.distribution||'—'],['Domicile',f.domicile||'—']];
   for(const [label,value] of values){const box=el('div');box.append(el('span','',label),el('strong','',value));metrics.append(box);}
