@@ -39,8 +39,17 @@ with sync_playwright() as p:
     assert 'RSI' not in page.locator('#company-risk-kpis').inner_text()
     assert page.locator('#company-advanced').get_attribute('open') is None
     assert 'RSI' in page.locator('#company-technical-kpis').inner_text()
-    page.locator('#research-tab-3').click();page.locator('#research-business .research-notebook').evaluate("(d)=>{for(let n=d;n;n=n.parentElement)if(n.tagName==='DETAILS')n.open=true}")
-    page.get_by_label('Competitive advantages & supporting evidence',exact=True).fill('R22 retained note')
+    page.locator('#research-tab-3').click()
+    notebook=page.locator('#research-business .research-notebook')
+    notebook.evaluate("(d)=>{for(let n=d;n;n=n.parentElement)if(n.tagName==='DETAILS')n.open=true}")
+    target=page.get_by_label('Competitive advantages & supporting evidence',exact=True)
+    if not target.is_visible():
+        state=target.evaluate("""e=>{let out=[];for(let n=e;n;n=n.parentElement){
+            const s=getComputedStyle(n);out.push({tag:n.tagName,id:n.id,classes:String(n.className),
+              open:n.open,hidden:n.hidden,display:s.display,visibility:s.visibility,height:n.getBoundingClientRect().height});}
+            return out}""")
+        print('NOTEBOOK_VISIBILITY_DIAGNOSTICS',json.dumps(state),flush=True)
+    target.fill('R22 retained note')
     page.reload(wait_until='domcontentloaded');page.wait_for_timeout(120)
     assert page.locator('#view-overview').is_visible()
     assert page.evaluate('location.hash')=='#overview'
