@@ -12,8 +12,16 @@ class Manifest(unittest.TestCase):
     def test_every_listed_asset_exists(self):
         for name in build_terminal.FRONTEND_EARLY_JS + build_terminal.FRONTEND_LATE_JS + [f for _, f in build_terminal.FRONTEND_CSS]:
             self.assertTrue((build_terminal.ROOT / name).is_file(), name)
-        for name in (build_site.LAYOUT_CSS, build_site.LAYOUT_JS):
+        for name in (build_site.PRESENTATION_CSS, build_site.PRESENTATION_JS):
             self.assertTrue((build_site.ROOT / name).is_file(), name)
+
+    def test_presentation_has_one_css_and_one_js_source(self):
+        css = (build_site.ROOT / build_site.PRESENTATION_CSS).read_text('utf-8')
+        js = (build_site.ROOT / build_site.PRESENTATION_JS).read_text('utf-8')
+        self.assertIn('.scope-', build_site.add_scope_aliases(css))
+        self.assertIn('function t3SemanticColours()', js)
+        self.assertIn('function mergeSnapshot(', js)
+        self.assertEqual(js.count('function t3SemanticColours()'), 1)
 
     def test_missing_insertion_point_stops_the_build(self):
         with self.assertRaises(SystemExit):

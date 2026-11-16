@@ -667,3 +667,642 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 window.addEventListener('load',()=>{applyLayout();setTimeout(applyLayout,150);});
 setTimeout(applyLayout,150);
 })();
+
+// Terminal polish — runs last, inside the application closure.
+// One return figure everywhere, explanations off, flat lists, stale-data flags.
+(function(){
+  const $q=(s,r=document)=>r.querySelector(s),$$=(s,r=document)=>[...r.querySelectorAll(s)];
+  const EMPTY=/^(unavailable|—|-|not disclosed|not verified|unverified|n\/a)$/i;
+  const DATED=/\d{4}-\d{2}-\d{2}/;
+  const pct=v=>(v==null||!Number.isFinite(+v))?'—':(typeof etfPct==='function'?etfPct(+v):(+v).toFixed(2)+'%');
+  const fund=()=>(typeof ETF_BY_SYMBOL!=='undefined'&&typeof etfState!=='undefined')?ETF_BY_SYMBOL.get(etfState.selected):null;
+  const today=()=>{const g=(typeof D!=='undefined'&&D.generatedAt)||'';return /^\d{4}-\d{2}-\d{2}/.test(g)?g.slice(0,10):new Date().toISOString().slice(0,10);};
+
+  const PS=t=>{t=String(t||'').trim();if(/^[PS]$/.test(t))return t;if(/^S\b|synthetic|swap/i.test(t))return 'S';if(/^P\b|physical/i.test(t))return 'P';return '?';};
+  // ETF detail: the 1Y/3Y/5Y shown in the detail are the same figures as the card and table.
+  function etfDetail(){
+    const f=fund();
+    for(const host of $$('#etf-risk-stats,#etf-detail-stats')){
+      for(const stat of $$('.etf-stat',host)){
+        const k=$q('.k',stat),v=$q('.v',stat),d=$q('.d',stat);if(!k||!v)continue;
+        const m=k.textContent.trim().match(/^([135])Y annualised$/i);
+        if(m&&f){const val=pct(f['return'+m[1]+'Y']);if(v.textContent!==val)v.textContent=val;if(d)d.remove();k.textContent=m[1]+'Y total return'+(m[1]==='1'?'':' (annualised)');}
+        const label=k.textContent.trim();
+        if(/^fund assets \(aum\)$/i.test(label)){stat.remove();continue;}
+        if(/^replication$/i.test(label)){const kind=(f&&typeof etfV5Kind==='function')?etfV5Kind(f)[0]:'';const ps=/^[PS]$/.test(kind)?kind:PS(v.textContent);if(v.textContent!==ps)v.textContent=ps;if(d)d.remove();continue;}
+        if(EMPTY.test(v.textContent.trim())){stat.remove();continue;}
+        if(d&&!DATED.test(d.textContent))d.remove();
+      }
+    }
+    const risk=$q('#etf-risk-stats');
+    if(risk&&f){
+      let basis=$q('#polish-etf-basis');
+      if(!basis){basis=document.createElement('div');basis.id='polish-etf-basis';basis.className='polish-basis';risk.before(basis);}
+      const end=f.returnPeriods?.['1Y']?.end||(f.quote?.asOf||'').slice(0,10);
+      const text='Returns: '+(f.returnBasis||'basis not recorded')+(end?' · to '+end:'')+(f.quote?.currency?' · '+f.quote.currency:'');
+      if(basis.textContent!==text)basis.textContent=text;
+    }
+  }
+
+  // ETF cards: drop filler tags; AUM is the whole fund, so say so.
+  function etfCards(){
+    for(const meta of $$('.etf-compare-card .etf-card-meta'))if(/^not in main table$/i.test(meta.textContent.trim()))meta.remove();
+    for(const span of $$('.etf-card-facts span'))if(/^Fund AUM/.test(span.textContent))span.textContent='Fund size';
+    for(const box of $$('.etf-card-facts > div')){const k=box.querySelector('span'),v=box.querySelector('strong');
+      if(k&&v&&/^structure$/i.test(k.textContent.trim())){k.textContent='Replication';const ps=PS(v.textContent);if(v.textContent!==ps)v.textContent=ps;}}
+    for(const th of $$('th')){const t=th.textContent.trim();if(/^Fund (AUM|assets)/.test(t)&&t!=='Fund size')th.textContent='Fund size';}
+    for(const k of $$('.etf-stat .k'))if(/^Fund assets|^Fund AUM/.test(k.textContent.trim()))k.textContent='Fund size';
+  }
+
+  // Calendar: keep a release time only when it is a real time; otherwise no sub-line.
+  function calendar(){
+    for(const mini of $$('#calendar-items .mt-cal-row .mini')){
+      const t=mini.textContent.match(/\b\d{1,2}:\d{2}(\s?(ET|CET|GMT|BST|UK))?\b/);
+      if(t){if(mini.textContent!==t[0])mini.textContent=t[0];}else mini.remove();
+    }
+    for(const small of $$('#calendar-items small'))if(!/\d{1,2}:\d{2}/.test(small.textContent))small.remove();
+  }
+
+  // Economics actuals: drop empty forecast columns, show source once, flag stale prints.
+  function periodEnd(text){
+    const s=text.trim().toUpperCase(),mon={JAN:1,FEB:2,MAR:3,APR:4,MAY:5,JUN:6,JUL:7,AUG:8,SEP:9,OCT:10,NOV:11,DEC:12};
+    let m=s.match(/^(\d{4}) (Q[1-4])$/);if(m){const q=+m[2][1];return {end:new Date(Date.UTC(+m[1],q*3,0)),limit:140};}
+    m=s.match(/^(\d{4}) ([A-Z]{3})$/);if(m&&mon[m[2]])return {end:new Date(Date.UTC(+m[1],mon[m[2]],0)),limit:80};
+    m=s.match(/^(\d{4})-(\d{2})$/);if(m)return {end:new Date(Date.UTC(+m[1],+m[2],0)),limit:80};
+    return null;
+  }
+  function macroTable(){
+    const body=$q('#macro-print-rows');if(!body||!body.rows.length)return;
+    const table=body.closest('table'),heads=[...table.tHead.rows[0].cells];
+    heads.forEach((th,i)=>{
+      const label=th.textContent.trim();
+      const cells=[...body.rows].map(r=>r.cells[i]).filter(Boolean);
+      const allEmpty=cells.every(c=>/^(—|-|)$/.test(c.textContent.trim()));
+      const hide=(/forecast|surprise/i.test(label)&&allEmpty)||/^source$/i.test(label);
+      th.classList.toggle('polish-hidden',hide);cells.forEach(c=>c.classList.toggle('polish-hidden',hide));
+      if(/^source$/i.test(label)){
+        const names=[...new Set(cells.map(c=>c.textContent.trim().split(/\s*·\s*/)[0]).filter(Boolean))];
+        let cap=$q('#polish-macro-source');
+        if(!cap){cap=document.createElement('p');cap.id='polish-macro-source';cap.className='polish-section-source';table.parentElement.after(cap);}
+        const text=names.length?'Source: '+names.join(', '):'';if(cap.textContent!==text)cap.textContent=text;
+      }
+    });
+    const pi=heads.findIndex(th=>/observation period/i.test(th.textContent));if(pi<0)return;
+    const now=Date.parse(today()+'T00:00:00Z');
+    for(const row of body.rows){
+      const cell=row.cells[pi];if(!cell)continue;
+      const raw=(cell.firstChild&&cell.firstChild.nodeType===3?cell.firstChild.textContent:cell.textContent).replace('stale','');
+      const p=periodEnd(raw);let flag=$q('.polish-stale',cell);
+      const stale=p&&(now-p.end.getTime())/86400000>p.limit;
+      if(stale&&!flag){flag=document.createElement('span');flag.className='polish-stale';flag.textContent='stale';
+        flag.title='A newer release should exist; the feed may be serving cached data';cell.append(flag);}
+      if(!stale&&flag)flag.remove();
+    }
+  }
+
+  // Gilt block: keep warnings, drop the standing method explanation.
+  function gilt(){for(const n of $$('#gilts .r28-gilt-single > p.note'))if(/^Gross cash figures are undiscounted/.test(n.textContent)&&!n.hidden)n.hidden=true;}
+
+  // Long tables: first rows in page flow, the rest behind "Show all" (no nested scroll boxes).
+  const LIMIT=20,expanded=new Set();
+  const WRAPS='.r28-table-scroll,.etf-table-scroll,.gilt-table-scroll,.mt-table-scroll,.constituents-scroll,.screener-scroll,.watchlist-table-scroll,.scroll,#ust-securities-scroll';
+  function wrapKey(w){return w.id||[...w.classList].join('.')+'@'+(w.closest('section[id],[id^=view-]')?.id||'');}
+  function longTables(){
+    for(const w of $$(WRAPS)){
+      if(w.closest('#view-quality')||w.parentElement?.closest(WRAPS))continue;
+      const body=w.querySelector('tbody');if(!body)continue;
+      const rows=[...body.rows].filter(r=>!/group|geo/.test(r.className));
+      const key=wrapKey(w),open=expanded.has(key),over=rows.length>LIMIT;
+      let n=0;
+      for(const r of body.rows){
+        const isGroup=/group|geo/.test(r.className);if(!isGroup)n++;
+        const keep=open||!over||n<=LIMIT||r.matches('.etf-active,.selected,.active,[aria-selected=true]');
+        if(r.classList.contains('polish-cut')===keep)r.classList.toggle('polish-cut',!keep);
+      }
+      let btn=w.nextElementSibling?.classList.contains('polish-more')?w.nextElementSibling:null;
+      if(!over){btn?.remove();continue;}
+      if(!btn){btn=document.createElement('button');btn.type='button';btn.className='polish-more';w.after(btn);}
+      btn.onclick=()=>{open?expanded.delete(key):expanded.add(key);longTables();if(open)w.scrollIntoView({block:'start'});};
+      const label=open?'Show fewer':'Show all '+rows.length;
+      if(btn.textContent!==label)btn.textContent=label;
+    }
+  }
+
+  // Search: gilts and US Treasuries are searchable, and every result lands on its detail.
+  function extendSearch(){
+    if(typeof fullSearchList==='undefined'||typeof chooseGlobalResult!=='function')return;
+    for(const g of (typeof giltList!=='undefined'?giltList:[]))
+      fullSearchList.push({kind:'gilt',label:g.name+(g.shortTicker?' ('+g.shortTicker+')':''),code:g.isin||g.ticker,ticker:g.ticker,detail:'UK gilt · matures '+g.maturity});
+    for(const b of (typeof ustList!=='undefined'?ustList:[]))
+      fullSearchList.push({kind:'ust',label:b.name,code:b.cusip,detail:'US Treasury · '+(b.type||'')+' · matures '+b.maturity});
+    const base=chooseGlobalResult;
+    const land=(id)=>setTimeout(()=>{const n=document.getElementById(id);if(n)n.scrollIntoView({behavior:'smooth',block:'start'});},120);
+    const bond=(i)=>{activateWorkspace('bonds',{scroll:false});if(typeof bondTab!=='undefined'){bondTab=i;renderBondTabs();}};
+    chooseGlobalResult=function(item){
+      if(!item)return;
+      if(item.kind==='gilt'){$('global-search').value='';closeGlobalResults();bond(0);giltState.symbol=item.ticker;renderGilts();land('gilt-stats');return;}
+      if(item.kind==='ust'){$('global-search').value='';closeGlobalResults();bond(1);ustState.selected=item.code;renderUST();land('ust-selected');return;}
+      base(item);
+      if(item.kind==='etfTracker')land('etf-selected');
+    };
+  }
+  try{extendSearch();}catch(err){console.warn('search extension:',err);}
+  try{if(typeof etfState!=='undefined'&&etfState.compared?.size){etfState.compared.clear();if(typeof renderEtfTracker==='function')renderEtfTracker();}}catch(err){}
+
+  // No references to SEC filings, EDGAR, XBRL or form numbers outside Data Quality.
+  const FILING=/\bSEC\b|EDGAR|XBRL|\b(?:10-K|10-Q|20-F|6-K|8-K)\b/;
+  function scrubFilings(){
+    const stage=document.getElementById('workspace-stage');if(!stage)return;
+    for(const a of stage.querySelectorAll('a[href*="sec.gov"]'))if(!a.closest('#view-quality'))a.remove();
+    for(const h of stage.querySelectorAll('summary,h3,h4,.r24-support-heading'))
+      if(/filing dates|Field-level sources/i.test(h.textContent)&&!h.closest('#view-quality')){const box=h.closest('details,section.r24-support')||h;box.hidden=true;}
+    const walk=document.createTreeWalker(stage,NodeFilter.SHOW_TEXT);const hits=[];let n;
+    while(n=walk.nextNode())if(FILING.test(n.textContent)&&!n.parentElement.closest('#view-quality,script,style'))hits.push(n);
+    for(const t of hits){
+      const v=t.textContent.replace(/SEC issuer filings?/gi,'issuer accounts').replace(/\(?SEC XBRL\)?\s*/gi,'').replace(/SEC (?:EDGAR )?(?:filings?|companyfacts)/gi,'issuer accounts')
+        .replace(/\b(?:EDGAR|XBRL)\b\s*/g,'').replace(/\b(?:10-K|10-Q|20-F|6-K|8-K)\b/g,'annual report').replace(/\bSEC\b\s*/g,'').replace(/\s{2,}/g,' ');
+      if(v!==t.textContent)t.textContent=v;
+    }
+  }
+
+  // Company figures carried over from the last good provider lookup carry their date.
+  function retainedDates(){
+    const pick=document.getElementById('company-pick');if(!pick||typeof D==='undefined')return;
+    const c=(D.companies||[]).find(x=>x.symbol===pick.value);const day=c?.fundamentalsRetainedFrom;
+    if(!day)return;
+    for(const tile of document.querySelectorAll('#view-companies .research-stats > *, #view-companies .t11-ratios > *, #view-companies .research-dashboard > *')){
+      const k=tile.firstElementChild?.textContent||'';
+      if(!/P\/E|market cap|dividend yield|EV \/ EBITDA|price \/ book|margin|return on equity|free cash flow|total debt/i.test(k))continue;
+      const v=tile.children[1]?.textContent.trim();if(!v||v==='—'||/unavailable/i.test(v))continue;
+      let note=tile.querySelector('.polish-retained');
+      if(!note){note=document.createElement('div');note.className='polish-retained';tile.append(note);}
+      const t='as of '+day;if(note.textContent!==t)note.textContent=t;
+    }
+  }
+
+  let busy=false,queued=false;
+  function polish(){
+    if(busy)return;busy=true;
+    try{etfDetail();etfCards();calendar();macroTable();gilt();longTables();scrubFilings();retainedDates();}
+    catch(err){console.warn('terminal polish:',err);}
+    finally{busy=false;}
+  }
+  function schedule(){if(queued)return;queued=true;requestAnimationFrame(()=>{queued=false;polish();});}
+  polish();
+  new MutationObserver(()=>{if(!busy)schedule();}).observe(document.body,{childList:true,subtree:true});
+})();
+
+// Reading headings follow page scroll even when a table has horizontal overflow.
+// Keep the real header in the table for semantics and forward sorting clicks.
+(function(){
+ const copies=new Map();let queued=false;
+ const set=(e,k,v)=>{if(e.style[k]!==v)e.style[k]=v;};
+ function update(){
+  queued=false;
+  const stage=document.getElementById('workspace-stage');if(!stage)return;
+  const nav=document.querySelector('.commandbar');
+  let top=Math.max(0,nav?.getBoundingClientRect().bottom||0);
+  for(const n of stage.querySelectorAll('.layout-subtabs,.mt-bond-nav,.r25-section-links,.watchlist-selected-header,#etf-tracker-panel .etf-detail>.row:first-child')){
+   const r=n.getBoundingClientRect();if(n.getClientRects().length&&getComputedStyle(n).position==='sticky'&&r.top<=top+2&&r.bottom>top)top=r.bottom;
+  }
+  const active=new Set();
+  for(const table of stage.querySelectorAll('table')){
+   const head=table.tHead;if(!head||!head.rows.length||!table.getClientRects().length)continue;
+   const rect=table.getBoundingClientRect(),height=head.getBoundingClientRect().height;
+   if(rect.top>=top||rect.bottom<=top+height||!height)continue;
+   let left=Math.max(0,rect.left),right=Math.min(innerWidth,rect.right);
+   for(let p=table.parentElement;p&&p!==stage;p=p.parentElement){
+    if(/auto|scroll|hidden|clip/.test(getComputedStyle(p).overflowX)){const r=p.getBoundingClientRect();left=Math.max(left,r.left);right=Math.min(right,r.right);}
+   }
+   if(right<=left)continue;
+   active.add(table);let copy=copies.get(table);
+   const signature=head.innerHTML;
+   if(!copy||copy.signature!==signature){
+    copy?.box.remove();const box=document.createElement('div');box.className='table-reading-head';box.setAttribute('aria-hidden','true');
+    const t=document.createElement('table'),h=head.cloneNode(true);t.append(h);box.append(t);
+    for(const n of h.querySelectorAll('[id]'))n.removeAttribute('id');
+    for(const n of h.querySelectorAll('button,a,input'))n.tabIndex=-1;
+    const originals=[...head.querySelectorAll('th,td')],clones=[...h.querySelectorAll('th,td')];
+    clones.forEach((c,i)=>{c.addEventListener('click',e=>{e.preventDefault();const button=originals[i].querySelector('button');(button||originals[i]).click();});});
+    document.body.append(box);copy={box,t,originals,clones,signature};copies.set(table,copy);
+   }
+   set(copy.box,'top',top+'px');set(copy.box,'left',left+'px');set(copy.box,'width',(right-left)+'px');
+   set(copy.t,'width',rect.width+'px');set(copy.t,'marginLeft',(rect.left-left)+'px');
+   copy.clones.forEach((c,i)=>{const source=copy.originals[i],style=getComputedStyle(source),r=source.getBoundingClientRect();
+    for(const key of ['display','font','color','padding','textAlign','letterSpacing','whiteSpace','borderBottom'])set(c,key,style[key]);
+    set(c,'width',r.width+'px');set(c,'minWidth',r.width+'px');set(c,'maxWidth',r.width+'px');
+   });
+  }
+  for(const [table,copy] of copies)if(!active.has(table)){copy.box.remove();copies.delete(table);}
+ }
+ function schedule(){if(!queued){queued=true;requestAnimationFrame(update);}}
+ document.addEventListener('scroll',schedule,{capture:true,passive:true});window.addEventListener('resize',schedule,{passive:true});
+ const stage=document.getElementById('workspace-stage');if(stage)new MutationObserver(schedule).observe(stage,{childList:true,subtree:true});
+ schedule();
+})();
+
+// Measure navigation rather than assuming an iPad or desktop header height.
+(function(){const nav=document.querySelector('.commandbar');if(!nav)return;const size=()=>document.documentElement.style.setProperty('--security-nav-height',nav.getBoundingClientRect().height+'px');size();new ResizeObserver(size).observe(nav);})();
+
+/* Readability layer — runs last. Presentation only: it rewords timestamps,
+   hides low-value columns and empty section rows. No market data is changed. */
+(function(){
+  const MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const isoShort=(y,m,d)=>`${+d} ${MONTHS[+m-1]}`;
+
+  // "5 Nov 2026, 16:30 UTC" -> "5 Nov, 16:30";  "2026-11-05" -> "5 Nov"
+  function shortTime(t){
+    return t.replace(/(\d{1,2} [A-Z][a-z]{2}) \d{4},? (\d{2}:\d{2})(?: UTC)?/g,'$1, $2')
+            .replace(/\b(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}:\d{2}))?(?: UTC)?/g,(m,y,mo,d,hm)=>isoShort(y,mo,d)+(hm?', '+hm:''))
+            .replace(/ UTC\b/g,'');
+  }
+
+  function setText(el,t){if(el.textContent!==t)el.textContent=t}
+
+  function header(){
+    const s=document.getElementById('stamp');
+    if(s&&/rerun Python/i.test(s.textContent))setText(s,s.textContent.replace(/\s*·\s*rerun Python to refresh/i,''));
+  }
+
+  function pulse(){
+    const board=document.getElementById('market-pulse');
+    if(!board)return;
+    if(!document.getElementById('rd-utc-note')){
+      const n=document.createElement('div');n.id='rd-utc-note';n.className='rd-utc-note';n.textContent='Quote times in UTC';
+      board.parentNode.insertBefore(n,board);
+    }
+    board.querySelectorAll('.r24-snapshot-item .mini').forEach(m=>{
+      if(m.children.length)return;
+      setText(m,shortTime(m.textContent));
+    });
+  }
+
+  // Tables: say "UTC" once in the column heading, not in every row.
+  function tableUtc(table){
+    const heads=table.tHead&&table.tHead.rows.length?[...table.tHead.rows[table.tHead.rows.length-1].cells]:[];
+    if(!heads.length)return;
+    const cols=new Set();
+    for(const tb of table.tBodies)for(const row of tb.rows){
+      if(row.cells.length!==heads.length)continue;
+      [...row.cells].forEach((c,i)=>{if(!c.children.length&&/\d{2}:\d{2} UTC$/.test(c.textContent.trim()))cols.add(i)});
+    }
+    cols.forEach(i=>{
+      const h=heads[i];
+      if(h&&!/UTC/.test(h.textContent)&&!h.querySelector('button'))setText(h,h.textContent.trim()+' (UTC)');
+      for(const tb of table.tBodies)for(const row of tb.rows){
+        const c=row.cells[i];
+        if(c&&row.cells.length===heads.length&&!c.children.length&&/ UTC$/.test(c.textContent.trim()))setText(c,c.textContent.trim().replace(/ UTC$/,''));
+      }
+    });
+  }
+
+  // Hide columns by heading text; keep the hidden values as a tooltip on the row.
+  const HIDE={
+    '#market-valuations':['P/E coverage','Financials retrieved'],
+    '#equity-screener':['Financials checked','Price history']
+  };
+  HIDE['.mt-risk-table']=['Observations'];
+  function hideCols(){
+    for(const [sel,names] of Object.entries(HIDE)){
+      const tables=sel.startsWith('#')?document.querySelectorAll(sel+' table'):document.querySelectorAll(sel);
+      tables.forEach(table=>{
+        if(!table.tHead)return;
+        const heads=[...table.tHead.rows[table.tHead.rows.length-1].cells];
+        const idx=heads.map((h,i)=>names.includes(h.textContent.trim())?i:-1).filter(i=>i>=0);
+        if(!idx.length)return;
+        idx.forEach(i=>heads[i].classList.add('rd-hide-col'));
+        for(const tb of table.tBodies)for(const row of tb.rows){
+          if(row.cells.length!==heads.length)continue;
+          const tip=idx.map(i=>heads[i].textContent.trim()+': '+row.cells[i].textContent.trim()).join(' · ');
+          idx.forEach(i=>row.cells[i].classList.add('rd-hide-col'));
+          if(row.cells[0]&&row.cells[0].title!==tip)row.cells[0].title=tip;
+        }
+      });
+    }
+  }
+
+  // A section heading with no visible rows under it is hidden.
+  function orphans(){
+    document.querySelectorAll('#workspace-stage tbody').forEach(tb=>{
+      const rows=[...tb.rows];
+      rows.forEach((r,i)=>{
+        if(!r.classList.contains('watch-section'))return;
+        let shown=false;
+        for(let j=i+1;j<rows.length&&!rows[j].classList.contains('watch-section');j++){
+          if(!rows[j].classList.contains('polish-cut')&&!rows[j].classList.contains('rd-orphan')&&rows[j].style.display!=='none'){shown=true;break}
+        }
+        if(r.classList.contains('rd-orphan')===shown)r.classList.toggle('rd-orphan',!shown);
+      });
+    });
+  }
+
+  // Economic indicators: "Prior 3.10% · 2026-08" -> value in bold, readable date.
+  function priors(){
+    document.querySelectorAll('#macro-tiles .r28-economic-sub').forEach(el=>{
+      if(el.querySelector('b'))return;
+      const m=el.textContent.match(/^Prior\s+(\S+)\s*·\s*(.+)$/);
+      if(!m)return;
+      let when=m[2].trim().replace(/^(\d{4})-(\d{2})$/,(x,y,mo)=>MONTHS[+mo-1]+' '+y)
+                         .replace(/^(\d{4}) ([A-Z]{3})$/,(x,y,mo)=>mo[0]+mo.slice(1).toLowerCase()+' '+y);
+      el.textContent='Prior ';const b=document.createElement('b');b.textContent=m[1];el.append(b,' · '+when);
+    });
+  }
+
+  // Dates: one style everywhere. "2027-01-29" -> "29 Jan 2027"; "2026-11-13 21:15" -> "13 Nov 2026, 21:15";
+  // "2026 SEP" -> "Sep 2026"; "2026 Q2" -> "Q2 2026".
+  const ISO=/\b(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}:\d{2})(?::\d{2})?)?(?: UTC)?\b/g;
+  const niceDate=t=>t.replace(ISO,(m,y,mo,d,hm)=>`${+d} ${MONTHS[+mo-1]} ${y}`+(hm?', '+hm:''))
+                     .replace(/^(\d{4}) ([A-Z]{3})$/,(m,y,mo)=>mo[0]+mo.slice(1).toLowerCase()+' '+y)
+                     .replace(/^(\d{4}) (Q[1-4])$/,'$2 $1')
+                     .replace(/^(\d{4})-(\d{2})$/,(m,y,mo)=>MONTHS[+mo-1]+' '+y);
+  function datesIn(root){
+    const w=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);let n;const todo=[];
+    while(n=w.nextNode()){const v=n.nodeValue;if(/\d{4}-\d{2}-\d{2}/.test(v)&&!n.parentElement.closest('input,select,textarea,script,style'))todo.push(n)}
+    todo.forEach(n=>{const v=niceDate(n.nodeValue);if(v!==n.nodeValue)n.nodeValue=v});
+  }
+  function econDates(){
+    document.querySelectorAll('#macro-tiles button .ml').forEach(el=>{if(/Bank of england/.test(el.textContent))el.textContent=el.textContent.replace('Bank of england','Bank of England')});
+    document.querySelectorAll('#macro-tiles button .md').forEach(el=>{if(!el.children.length){const v=niceDate(el.textContent.trim());if(v!==el.textContent)el.textContent=v}});
+    document.querySelectorAll('#macro-tiles .r28-economic-sub').forEach(el=>{
+      const last=el.lastChild;if(!last||last.nodeType!==3)return;
+      const m=last.nodeValue.match(/^(\s*·\s*)(.+)$/);if(!m)return;
+      const v=m[1]+niceDate(m[2].trim());if(v!==last.nodeValue)last.nodeValue=v;
+    });
+  }
+  // Words in the reading font, figures in the monospace.
+  const NUM=/^[\s(]*[+\-−–]?\s*(?:USD|GBP|EUR|£|\$|€)?\s*[+\-−–]?[\d][\d.,]*\s*(?:%|bp|pp|x|×|bn|m|k|p)?\s*\*?\s*[)]?\s*$|^[\s—–-]*$/;
+  const DATEISH=/^\s*\d{1,2} [A-Z][a-z]{2}(?: \d{4})?(?:, \d{2}:\d{2})?\s*$|^\s*\d{4}(?:-\d{2}){1,2}/;
+  function classify(){
+    const DATECOL=/date|time|as of|maturity|matures|retrieved|checked/i;
+    document.querySelectorAll('#workspace-stage table').forEach(table=>{
+      const hr=table.tHead&&table.tHead.rows.length?table.tHead.rows[table.tHead.rows.length-1]:null;
+      if(!hr)return;
+      [...hr.cells].forEach((h,i)=>{if(!DATECOL.test(h.textContent))return;
+        for(const tb of table.tBodies)for(const row of tb.rows){const c=row.cells[i];
+          if(c&&row.cells.length===hr.cells.length&&!c.querySelector('canvas,svg,input,select,button')){c.classList.add('rd-num');c.classList.remove('rd-txt');c.dataset.rdCol='date'}}});
+    });
+    document.querySelectorAll('#workspace-stage table tbody td').forEach(td=>{
+      if(td.dataset.rdCol==='date'||td.querySelector('canvas,svg,input,select,button'))return;
+      const kids=[...td.children];
+      if(!kids.length){
+        const t=td.textContent;const num=NUM.test(t)||DATEISH.test(t);
+        td.classList.toggle('rd-num',num);td.classList.toggle('rd-txt',!num);
+      }else{
+        kids.forEach(k=>{if(k.children.length&&k.querySelector('canvas,svg'))return;
+          const t=k.textContent;const num=NUM.test(t)||DATEISH.test(t);
+          k.classList.toggle('rd-num',num);k.classList.toggle('rd-txt',!num);});
+      }
+    });
+  }
+
+
+  // ---- Terminal 3 additions ----
+  // Currency: $ £ € symbols, never "USD 12.3bn" / "GBp".
+  const SYM={USD:'$',GBP:'£',EUR:'€',JPY:'¥'};
+  const NUMPART='[+\\-−]?\\d[\\d,]*(?:\\.\\d+)?\\s?(?:bn|tn|m|k)?';
+  const RE1=new RegExp('\\b(USD|GBP|EUR|JPY)\\s+('+NUMPART+')(?![\\w%])','g');
+  const RE2=new RegExp('(^|[^\\w.])('+NUMPART+')\\s+(USD|GBP|EUR|JPY)\\b','g');
+  function currency(){
+    const root=document.getElementById('workspace-stage');if(!root)return;
+    const w=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);let n;const todo=[];
+    while(n=w.nextNode()){const v=n.nodeValue;if(!/USD|GBP|EUR|JPY|GBp/.test(v))continue;
+      if(n.parentElement.closest('input,select,textarea,script,style,option'))continue;todo.push(n)}
+    todo.forEach(n=>{let v=n.nodeValue;
+      v=v.replace(RE1,(m,c,x)=>SYM[c]+x.replace(/\s/g,'')).replace(RE2,(m,pre,x,c)=>pre+SYM[c]+x.replace(/\s/g,''));
+      // Keep GBp as pence. Rendering routines must divide by 100 before showing GBP.
+      if(v!==n.nodeValue)n.nodeValue=v});
+  }
+  // Header follows its column: numeric columns right-aligned, text columns left.
+  function align(){
+    document.querySelectorAll('#workspace-stage table').forEach(table=>{
+      const hr=table.tHead&&table.tHead.rows.length?table.tHead.rows[table.tHead.rows.length-1]:null;if(!hr)return;
+      const heads=[...hr.cells];if(heads.length<2)return;
+      heads.forEach((h,i)=>{
+        let num=0,tot=0;
+        for(const tb of table.tBodies)for(const row of tb.rows){
+          if(row.cells.length!==heads.length||row.classList.contains('rd-orphan'))continue;
+          const c=row.cells[i];if(c.querySelector('input,button,canvas,svg'))continue;
+          const t=c.textContent.trim();if(!t)continue;tot++;if(c.classList.contains('rd-num')&&!/^\d{1,2} [A-Z][a-z]{2}/.test(t)||/^[—–-]$/.test(t))num++;
+        }
+        const cls=tot&&num/tot>=0.6?'rd-r':'rd-l';
+        [h,...[...table.tBodies].flatMap(tb=>[...tb.rows].filter(r=>r.cells.length===heads.length).map(r=>r.cells[i]))].forEach(c=>{
+          if(c.classList.contains(cls))return;c.classList.remove('rd-r','rd-l');
+          if(c.querySelector('input[type=checkbox]')||c.classList.contains('etf-compact-code')||/^P\/S$/.test(h.textContent.trim())){c.classList.add('rd-c');return}
+          c.classList.add(cls)});
+      });
+    });
+  }
+  // Return columns: green up, red down, everywhere.
+  function tone(){
+    const RET=/^(1D|1W|1M|3M|6M|YTD|1Y|3Y|5Y|10Y|Day|Week|Month|Year|Change|Ann\. price return)\b/i;
+    document.querySelectorAll('#workspace-stage table').forEach(table=>{
+      const hr=table.tHead&&table.tHead.rows.length?table.tHead.rows[table.tHead.rows.length-1]:null;if(!hr)return;
+      [...hr.cells].forEach((h,i)=>{if(!RET.test(h.textContent.trim().replace(/[▾▴]/g,'').trim()))return;
+        for(const tb of table.tBodies)for(const row of tb.rows){if(row.cells.length!==hr.cells.length)continue;
+          const c=row.cells[i];if(c.classList.contains('up')||c.classList.contains('down'))continue;
+          const t=c.textContent.trim().replace('−','-');if(!/%|bp|pp/.test(t))continue;
+          const neg=/^-/.test(t);const pos=/^\+/.test(t)||(/^\d/.test(t)&&parseFloat(t)>0);
+          c.classList.toggle('rd-neg',neg);c.classList.toggle('rd-pos',pos&&!neg)}});
+    });
+  }
+  // Drop Market signals; fold explanatory notes behind a small i button.
+  function slim(){
+    document.querySelectorAll('#workspace-stage h2,#workspace-stage h3').forEach(h=>{
+      if(/^market signals$/i.test(h.textContent.trim())){const box=h.closest('section,.panel')||h.parentElement;box.classList.add('rd-gone')}});
+    document.querySelectorAll('#r23-alerts').forEach(x=>x.classList.add('rd-gone'));
+    document.querySelectorAll('#workspace-stage a,#workspace-stage button').forEach(a=>{if(/^market signals$/i.test(a.textContent.trim()))a.classList.add('rd-gone')});
+    // Keep editable research notebooks usable. Another presentation layer can
+    // turn <details> into <section>, so excluding only "closest(details)" was
+    // hiding entire input labels (and all their textareas) behind an info button.
+    document.querySelectorAll('#workspace-stage .research-notebook label.rd-gone').forEach(note=>{
+      note.classList.remove('rd-gone');delete note.dataset.rdFolded;
+    });
+    document.querySelectorAll('#workspace-stage .panel .note, #workspace-stage .research-hint, #workspace-stage .mt-inline-notice').forEach(note=>{
+      if(note.matches('label,form')||note.querySelector('input,select,textarea,button,[contenteditable]')||
+         note.closest('.research-notebook,form')||
+         note.dataset.rdFolded||note.closest('table,details,.rd-gone')||
+         /synthetic|warning|error|failed|unavailable/i.test(note.className+' '+note.textContent.slice(0,60)))return;
+      if(note.textContent.trim().length<40)return;
+      const panel=note.closest('.panel');const head=panel&&panel.querySelector('h2,h3');if(!head)return;
+      note.dataset.rdFolded='1';note.classList.add('rd-gone');
+      let btn=panel.querySelector(':scope .rd-note-btn');
+      if(!btn){btn=document.createElement('button');btn.type='button';btn.className='rd-note-btn';btn.setAttribute('aria-expanded','false');btn.title='About this table';head.append(btn);
+        btn.onclick=e=>{e.stopPropagation();const open=btn.getAttribute('aria-expanded')!=='true';btn.setAttribute('aria-expanded',open);panel.querySelectorAll('[data-rd-folded]').forEach(n=>n.classList.toggle('rd-gone',!open))}}
+    });
+  }
+
+
+  // Terminal 3: pulse yields in colour, tile figures signed, dates without year or time on condition tables.
+  function t3colour(){
+    document.querySelectorAll('#market-pulse .r24-snapshot-item .mini').forEach(m=>{
+      const t=m.textContent.replace('−','-');const mm=t.match(/^([+\-]?\d+(?:\.\d+)?) bp since/);if(!mm)return;
+      const v=parseFloat(mm[1]);m.classList.toggle('rd-pos',v>0);m.classList.toggle('rd-neg',v<0);
+      const short=m.textContent.replace(/ (\d{1,2} [A-Z][a-z]{2}) \d{4}/g,' $1');if(short!==m.textContent)m.textContent=short;
+    });
+    document.querySelectorAll('#workspace-stage .research-stat .val').forEach(v=>{
+      const t=v.textContent.trim().replace('−','-');
+      v.classList.toggle('rd-neg',/^-\d/.test(t)&&/%$/.test(t));v.classList.toggle('rd-pos',/^\+\d/.test(t)&&/%$/.test(t));
+    });
+    document.querySelectorAll('#workspace-stage h3,#workspace-stage h4,#workspace-stage .research-group-title,#workspace-stage summary').forEach(h=>{
+      if(/^(Price & valuation|Size & growth|Profitability|Cash & balance sheet)$/i.test(h.textContent.trim()))h.classList.add('rd-amber')});
+    document.querySelectorAll('#workspace-stage table').forEach(table=>{
+      const hr=table.tHead&&table.tHead.rows.length?table.tHead.rows[table.tHead.rows.length-1]:null;if(!hr)return;
+      const cond=table.classList.contains('r24-conditions-table')||table.classList.contains('r26-conditions');
+      [...hr.cells].forEach((h,i)=>{
+        if(!/^(observation date|date)( \(utc\))?$/i.test(h.textContent.trim().replace(/\s+/g,' ')))return;
+        if(!cond)return;
+        if(h.textContent.trim()!=='Date')h.textContent='Date';
+        for(const tb of table.tBodies)for(const row of tb.rows){const c=row.cells[i];if(!c)continue;
+          c.querySelectorAll('div').forEach(d=>{if(!d.children.length)fix(d)});if(!c.querySelector('div'))fix(c)}
+      });
+      if(cond)for(const tb of table.tBodies)for(const row of tb.rows)for(const c of row.cells)(c.querySelectorAll('div').length?c.querySelectorAll('div'):[c]).forEach(d=>{if(!d.children.length)fix(d)});
+    });
+    document.querySelectorAll('.r24-conditions-table .r24-line,.r26-conditions td').forEach(d=>{
+      if(d.children.length)return;const t=d.textContent.trim().replace('−','-');
+      if(/^[+\-]?\d+(?:\.\d+)?\s?(bp|%)/.test(t)||/^1M [+\-]?\d/.test(t)){const v=parseFloat(t.replace(/^1M /,''));d.classList.toggle('rd-pos',v>0);d.classList.toggle('rd-neg',v<0)}});
+    function fix(n){const v=n.textContent.replace(/(\d{1,2} [A-Z][a-z]{2}) \d{4}(?:,? \d{2}:\d{2})?(?: UTC)?/g,'$1');if(v!==n.textContent)n.textContent=v}
+  }
+
+  let busy=false,queued=false;
+  function apply(){
+    if(busy)return;busy=true;
+    try{
+      header();pulse();
+      document.querySelectorAll('#workspace-stage table').forEach(tableUtc);
+      hideCols();orphans();priors();
+      document.querySelectorAll('#workspace-stage table tbody').forEach(datesIn);econDates();classify();currency();t3colour();align();tone();slim();t3SemanticColours();
+    }catch(e){console.warn('readability layer',e)}
+    busy=false;
+  }
+  function schedule(){if(queued)return;queued=true;setTimeout(()=>{queued=false;apply()},60)}
+
+  apply();
+  const stage=document.getElementById('workspace-stage')||document.body;
+  new MutationObserver(()=>{if(!busy)schedule()}).observe(stage,{childList:true,subtree:true,characterData:true});
+  const st=document.getElementById('stamp');if(st)new MutationObserver(()=>{if(!busy)schedule()}).observe(st,{childList:true,characterData:true,subtree:true});
+})();
+
+/* Semantic colour semantics for Terminal 3. This runs inside the existing
+   market application and is called by the existing readability repaint cycle.
+   No values are calculated or modified apart from displaying an observed
+   actual-minus-previous difference on the economics cards. */
+function t3SemanticColours(){
+  const root=document.getElementById('workspace-stage');
+  if(!root)return;
+  const cls=['t3-positive','t3-negative','t3-volatility','t3-primary','t3-neutral','t3-empty'];
+  const finite=x=>x!==null&&x!==undefined&&x!==''&&Number.isFinite(Number(x));
+  function number(text){
+    const s=String(text||'').replace(/,/g,'').replace(/−/g,'-').trim();
+    if(!s||/^(?:—|–|unavailable|insufficient|not sourced|loading|n\/a)$/i.test(s))return null;
+    const hit=s.match(/(?:^|[^\w])([+\-]?\d+(?:\.\d+)?)(?![\d])/);
+    return hit?Number(hit[1]):null;
+  }
+  function mark(node,tone){
+    if(!node)return;
+    cls.forEach(c=>node.classList.toggle(c,c===tone));
+  }
+  function classify(label,value){
+    const name=String(label||'').replace(/\s+/g,' ').trim().toLowerCase();
+    const str=String(value||'').trim();
+    if(!str||str==='—'||/^(?:unavailable|not available|insufficient|loading|no data)/i.test(str))return 't3-empty';
+    const n=number(str);
+    // Drawdown is a peak-to-trough loss. It must not turn green because a
+    // source happens to report the loss as a positive magnitude.
+    if(/(?:max(?:imum)?\s+)?drawdown|peak.to.trough/.test(name))return n!=null&&n!==0?'t3-negative':'t3-neutral';
+    if(/volatility|\bvol\b|\bvix\b|\bbeta\b|\bcorrelation\b|\brsi\b|tracking error/.test(name))return 't3-volatility';
+    // A yield is an income/rate level, not a price move. A positive yield
+    // gets green even though a *rise in yield* can reduce the bond's price.
+    if(/earnings yield|dividend yield|gross ytm|yield to maturity|\bytm\b|cash return|gross return|coupon rate|interest yield|total profit for holding/.test(name))
+      return n==null?'t3-empty':n<0?'t3-negative':'t3-positive';
+    if(/return|price move|day move|\bdaily move\b|\bchange\b|\bmomentum\b|growth|profit margin|return on (?:equity|capital|invested capital)|\broe\b|\broic\b/.test(name))
+      return n==null?'t3-empty':n>0?'t3-positive':n<0?'t3-negative':'t3-neutral';
+    if(/(?:net |operating )?profit\b|\bearnings\b|free cash flow|cash generation/.test(name))
+      return n==null?'t3-empty':n<0?'t3-negative':'t3-primary';
+    if(/\b(price|capitalisation|valuation|revenue|\ba[uy]m\b|assets|bid|offer|cost|value|p\/e|p\/b|52.week)/.test(name))
+      return 't3-primary';
+    return null;
+  }
+  // The exact same class mapping covers watchlist metrics, research metrics
+  // (including changing the selected company), analytics and gilt/Treasury KPIs.
+  const cards=root.querySelectorAll(
+    '#view-watchlist .watchlist-stat,#view-companies .watchlist-stat,'+
+    '#view-companies .company-kpi,#view-companies .research-dashboard .research-card,'+
+    '#view-companies .research-stat,#view-analytics .analytic-stat,'+
+    '#view-bonds .research-stat,#view-bonds .r28-gilt-yield,#view-bonds .r28-gilt-fact,'+
+    '#view-etfs .etf-stat'
+  );
+  cards.forEach(card=>{
+    const lab=card.querySelector(':scope > .k,:scope > .key,:scope > .lab,:scope > .mini,:scope > span.mini');
+    const val=card.querySelector(':scope > .v,:scope > .val,:scope > strong,:scope > .value');
+    if(lab&&val)mark(val,classify(lab.textContent,val.textContent));
+  });
+  // Earnings yield is the fifth valuation-column, while the premium to
+  // government bond yield is the eighth: colour each by its actual sign.
+  const valuation=root.querySelector('#valuation-rows');
+  if(valuation)valuation.querySelectorAll('tr').forEach(tr=>{
+    const cells=[...tr.cells];if(cells.length<8)return;
+    for(const i of [4,5,7]){
+      const n=number(cells[i].textContent);
+      mark(cells[i],n==null?'t3-empty':n<0?'t3-negative':n>0?'t3-positive':'t3-neutral');
+    }
+  });
+  // Use column headings, not hard-coded column numbers, on Treasury and
+  // gilt tables, so bid/offer prices and durations remain neutral.
+  root.querySelectorAll('#view-bonds table').forEach(table=>{
+    const headings=[...(table.tHead?.rows?.[0]?.cells||[])];
+    headings.forEach((th,i)=>{
+      const label=th.textContent.replace(/\s+/g,' ').trim();
+      if(!/(gross ytm|yield to maturity|gross yield|running yield|annualised yield|cash return)/i.test(label))return;
+      for(const body of table.tBodies)for(const row of body.rows){
+        const cell=row.cells[i];if(!cell)continue;
+        const n=number(cell.textContent);
+        mark(cell,n==null?'t3-empty':n<0?'t3-negative':n>0?'t3-positive':'t3-neutral');
+      }
+    });
+  });
+  // The macro tiles are generated from the same D.macro rows used for the
+  // displayed latest actual. Never infer a comparison from a missing source.
+  const macro=[...(D.macro||[])].filter(m=>(m.region||'US')===state.macroRegion);
+  const prints=new Map((D.economicPrints||[]).map(p=>[p.key,p]));
+  const econ=root.querySelector('#macro-tiles');
+  if(econ){
+    const tiles=[...econ.children].filter(n=>n.matches('button'));
+    for(let i=0;i<tiles.length&&i<macro.length;i++){
+      const m=macro[i],p=prints.get(m.key),tile=tiles[i];
+      const actual=m.value,previous=p?.previous;
+      const mperiod=String(m.period||m.date||'').slice(0,10),pperiod=String(p?.period||p?.observationDate||'').slice(0,10);
+      const compatible=finite(actual)&&finite(previous)&&
+        (!finite(p?.value)||Math.abs(Number(p.value)-Number(actual))<0.00001)&&
+        (!mperiod||!pperiod||mperiod===pperiod);
+      const value=tile.querySelector('.mv'),prior=tile.querySelector('.r28-economic-sub');
+      let delta=tile.querySelector('.t3-econ-delta');
+      if(!compatible){
+        mark(value,null);if(delta)delta.remove();continue;
+      }
+      const move=Number(actual)-Number(previous);
+      const movement=Math.abs(move)<1e-9?0:move;
+      const direction=movement>0?'t3-positive':movement<0?'t3-negative':'t3-neutral';
+      mark(value,direction);
+      if(!delta){delta=document.createElement('div');delta.className='t3-econ-delta';(prior||value||tile.lastChild).after(delta);}
+      const unit=p.unit||m.unit||'';
+      const label=movement===0?'No change vs prior':(movement>0?'↑ +':'↓ −')+fmt(Math.abs(movement),2)+unit+' vs prior';
+      if(delta.textContent!==label)delta.textContent=label;
+      mark(delta,direction);
+      delta.title='Increase/decrease since previous official observation; not a judgement about economic conditions.';
+    }
+  }
+  // Actual-vs-previous table: colour actual by direction, leave the prior
+  // number untouched and never fabricate forecast data.
+  const printed=(D.economicPrints||[]).filter(p=>p.region===state.macroRegion).sort((a,b)=>String(a.name).localeCompare(String(b.name)));
+  const table=root.querySelector('#macro-print-rows');
+  if(table){
+    const rows=[...table.rows];
+    printed.forEach((p,i)=>{
+      const tr=rows[i],cell=tr?.cells?.[2];if(!cell||tr.cells[0]?.textContent!==p.name)return;
+      const valid=finite(p.value)&&finite(p.previous),d=valid?Number(p.value)-Number(p.previous):null;
+      const tone=d==null?'t3-empty':d>0?'t3-positive':d<0?'t3-negative':'t3-neutral';
+      mark(cell,tone);
+      if(valid)cell.title=(d>0?'Increase':d<0?'Decrease':'No change')+' vs previous observation (direction only)';
+    });
+  }
+}
