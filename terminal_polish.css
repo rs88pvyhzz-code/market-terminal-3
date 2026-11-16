@@ -13,7 +13,7 @@
 footer.foot{display:none!important}
 
 /* 2. Data Quality is off the tab bar and has no link. */
-#tab-quality{display:none!important}
+/* Data Quality remains accessible as a top-level tab for source exceptions. */
 
 /* 3. ETF metrics: US Treasuries tiles on wide screens; label | value rows on phones. */
 @media (max-width:600px){
