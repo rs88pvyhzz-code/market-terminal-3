@@ -43,12 +43,7 @@ with sync_playwright() as p:
     notebook=page.locator('#research-business .research-notebook')
     notebook.evaluate("(d)=>{for(let n=d;n;n=n.parentElement)if(n.tagName==='DETAILS')n.open=true}")
     target=page.get_by_label('Competitive advantages & supporting evidence',exact=True)
-    if not target.is_visible():
-        state=target.evaluate("""e=>{let out=[];for(let n=e;n;n=n.parentElement){
-            const s=getComputedStyle(n);out.push({tag:n.tagName,id:n.id,classes:String(n.className),
-              open:n.open,hidden:n.hidden,display:s.display,visibility:s.visibility,height:n.getBoundingClientRect().height});}
-            return out}""")
-        print('NOTEBOOK_VISIBILITY_DIAGNOSTICS',json.dumps(state),flush=True)
+    assert target.is_visible(), 'Research notebook textarea must remain accessible in Terminal 3'
     target.fill('R22 retained note')
     page.reload(wait_until='domcontentloaded');page.wait_for_timeout(120)
     assert page.locator('#view-overview').is_visible()
