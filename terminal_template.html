@@ -1224,7 +1224,7 @@ function renderWatch(){const body=$('watch-rows');body.replaceChildren();let row
   td(tr,q.name);td(tr,q.currency||'—','hide-sm');td(tr,price(q),'n');
   for(const k of ['day','ytd','year'])td(tr,move(q,k),'n '+tone(moveVal(q,k)));
   for(const k of ['three','five']){const v=watchLongReturn(q,k);td(tr,v==null?'—':pc(v),'n '+tone(v));}
-  td(tr,fmt(q.low52,prec(q)),'n hide-sm');td(tr,fmt(q.high52,prec(q)),'n hide-sm');td(tr,q.asOf||'—','hide-sm');
+  td(tr,fmt(q.low52,prec(q)),'n hide-sm');td(tr,fmt(q.high52,prec(q)),'n hide-sm');const quoteDate=td(tr,q.asOf?String(q.asOf).slice(0,10):'—','hide-sm');quoteDate.title=q.asOf||'Source timestamp unavailable';
   tr.onclick=()=>{state.sym=q.symbol;$('main-pick').value=q.symbol;renderMain();renderWatch();};body.append(tr);}
 }
 function healthcareComparison(asset,benchmark){
