@@ -35,28 +35,85 @@ def _unpack(raw):
     return obj
 
 
+def _merge_history_archives(accumulated, incoming):
+    """Retain the longest dated price series while incorporating compatible new closes."""
+    if not isinstance(incoming, dict) or not isinstance(incoming.get('records'), dict):
+        return accumulated
+    if not accumulated:
+        return incoming
+    records = accumulated.setdefault('records', {})
+    attempts = accumulated.setdefault('attempts', {})
+    for symbol, record in incoming['records'].items():
+        if not isinstance(record, dict) or not isinstance(record.get('points'), list):
+            continue
+        old = records.get(symbol)
+        if not isinstance(old, dict):
+            records[symbol] = record
+            continue
+        old_points = old.get('points') or []
+        new_points = record['points']
+        if len(new_points) < 2:
+            continue
+        if len(old_points) < 2:
+            records[symbol] = record
+            continue
+        previous = dict(old_points)
+        overlap = [(v,previous[d]) for d,v in new_points if d in previous and previous[d] > 0]
+        # Only splice histories that use the same currency and price-adjustment basis.
+        same_currency = old.get('currency') == record.get('currency') or not old.get('currency') or not record.get('currency')
+        comparable = same_currency and len(overlap) >= 2 and all(
+            abs(v / prior - 1) < 0.08 for v,prior in overlap[-5:])
+        if comparable:
+            merged = dict(old_points)
+            merged.update(dict(new_points))
+            best = record if str(record.get('asOf','')) >= str(old.get('asOf','')) else old
+            records[symbol] = {**best, 'points': [[day,price] for day,price in sorted(merged.items())],
+                               'currency': best.get('currency') or old.get('currency') or record.get('currency')}
+        else:
+            # Never sacrifice a ten-year historical series for a recent short response.
+            score = lambda points: (len(points), str(points[-1][0]))
+            if score(new_points) > score(old_points):
+                records[symbol] = record
+    for symbol,when in (incoming.get('attempts') or {}).items():
+        if str(when) > str(attempts.get(symbol,'')):
+            attempts[symbol] = when
+    return accumulated
+
+
 def prior_cache(url=None, opener=None):
-    """Retrieve prior published compressed cache, if available."""
-    if not url:
+    """Recover complete historical prices from Terminal 2 and this site.
+
+    Explicit URL keeps the single-source behaviour used by callers and tests.
+    Terminal 3 migrations merge the old and new caches by ticker and observation.
+    """
+    if url:
+        urls = (url,)
+    else:
         repo = os.environ.get('GITHUB_REPOSITORY', '')
         if '/' not in repo:
             return {}
         owner, project = repo.split('/', 1)
-        url = f'https://{owner}.github.io/{project}/{CACHE_NAME}'
-    try:
-        req = urllib.request.Request(url, headers={'User-Agent': 'MarketTerminal/1.0'})
-        if opener:
-            return _unpack(opener(req))
-        with urllib.request.urlopen(req, timeout=20) as response:
-            # Upper bound prevents accidentally downloading an enormous error page.
-            raw = response.read(80_000_001)
-        if len(raw) > 80_000_000:
-            raise ValueError('Historic price cache too large')
-        return _unpack(raw)
-    except Exception as exc:
-        print(f'Price history: earlier cache not available ({str(exc)[:110]})', flush=True)
-        return {}
-
+        current = f'https://{owner}.github.io/{project}/{CACHE_NAME}'
+        sibling = f'https://{owner}.github.io/Market-terminal-2/{CACHE_NAME}'
+        urls = (sibling,current) if project.lower() == 'market-terminal-3' else (current,)
+    saved = {}
+    for source in urls:
+        try:
+            req = urllib.request.Request(source, headers={'User-Agent': 'MarketTerminal/1.0',
+                                                           'Cache-Control': 'no-cache'})
+            if opener:
+                new = _unpack(opener(req))
+            else:
+                with urllib.request.urlopen(req, timeout=30) as response:
+                    raw = response.read(80_000_001)
+                if len(raw) > 80_000_000:
+                    raise ValueError('Historic price cache too large')
+                new = _unpack(raw)
+            saved = _merge_history_archives(saved, new)
+            print(f'Price history: recovered {len(new["records"])} symbols from {source}',flush=True)
+        except Exception as exc:
+            print(f'Price history: earlier cache not available ({source}: {str(exc)[:110]})', flush=True)
+    return saved
 
 def _date(value):
     try:
