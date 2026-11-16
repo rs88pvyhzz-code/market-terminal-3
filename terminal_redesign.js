@@ -22,7 +22,7 @@ function r24VisibleSection(detail) {
 function r24SelectivePresentation(root=document) {
   // Only exceptions and technical audits are disclosures. Facts, sources and models stay direct.
   for(const detail of [...root.querySelectorAll('details')]){
-    if(detail.classList.contains('period-dates'))continue; // custom chart dates stay behind their button
+    if(detail.classList.contains('period-dates')||detail.classList.contains('source-provenance'))continue; // preserve purposeful date/source disclosures
     // Restore the original ETF reference disclosure; selected fund details stay direct.
     if(detail.closest('#etf-tracker-panel'))continue;
     const title=detail.querySelector(':scope > summary')?.textContent||'';
