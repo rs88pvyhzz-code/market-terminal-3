@@ -39,7 +39,7 @@ with sync_playwright() as p:
     assert 'RSI' not in page.locator('#company-risk-kpis').inner_text()
     assert page.locator('#company-advanced').get_attribute('open') is None
     assert 'RSI' in page.locator('#company-technical-kpis').inner_text()
-    page.locator('#research-tab-3').click();page.locator('#research-business .research-notebook').evaluate('(d)=>d.open=true')
+    page.locator('#research-tab-3').click();page.locator('#research-business .research-notebook').evaluate("(d)=>{for(let n=d;n;n=n.parentElement)if(n.tagName==='DETAILS')n.open=true}")
     page.get_by_label('Competitive advantages & supporting evidence',exact=True).fill('R22 retained note')
     page.reload(wait_until='domcontentloaded');page.wait_for_timeout(120)
     assert page.locator('#view-overview').is_visible()
