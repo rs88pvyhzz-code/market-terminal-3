@@ -28,16 +28,12 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
-LAYOUT_CSS = 'terminal_layout.css'
-LAYOUT_JS = 'terminal_layout.js'
+# One ordered presentation implementation replaces four cascading modules.
+# Runtime output is byte-for-byte equivalent to the former joined files.
+PRESENTATION_CSS = 'terminal_presentation.css'
+PRESENTATION_JS = 'terminal_presentation.js'
 LAYOUT_STYLE_ID = 'terminal-layout-styles'
 LAYOUT_SCRIPT_ID = 'terminal-layout-script'
-POLISH_CSS = 'terminal_polish.css'
-POLISH_JS = 'terminal_polish.js'
-READABILITY_CSS = 'terminal_readability.css'
-READABILITY_JS = 'terminal_readability.js'
-SEMANTIC_CSS = 'terminal_semantic_colours.css'
-SEMANTIC_JS = 'terminal_semantic_colours.js'
 NEWS_JS = 'news_freshness.js'
 NEWS_SCRIPT_ID = 'news-freshness'
 
@@ -150,9 +146,9 @@ def inject_layout(html_path):
     for marker, label in (('</head>', 'stylesheet'), (MAIN_SCRIPT_END, 'script')):
         if html.count(marker) != 1:
             raise SystemExit(f'Layout {label} insertion point found {html.count(marker)} times (expected 1): {marker!r}')
-    # Polish follows the layout, and readability follows polish, so it has the last word on presentation.
-    css = '\n'.join((ROOT / f).read_text('utf-8') for f in (LAYOUT_CSS, POLISH_CSS, READABILITY_CSS, SEMANTIC_CSS))
-    js = '\n'.join((ROOT / f).read_text('utf-8') for f in (LAYOUT_JS, POLISH_JS, READABILITY_JS, SEMANTIC_JS))
+    # Preserve the existing selector precedence and DOM behavior exactly.
+    css = (ROOT / PRESENTATION_CSS).read_text('utf-8')
+    js = (ROOT / PRESENTATION_JS).read_text('utf-8')
     if '</script' in js.lower() or '</style' in css.lower():
         raise SystemExit('Layout assets must not contain closing script or style tags.')
     # News freshness runs on the snapshot data before the application reads it.
