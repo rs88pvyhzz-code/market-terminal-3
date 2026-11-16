@@ -19,12 +19,15 @@ fc=payload.get('fundamentalsCoverage') or {}
 pc=payload.get('priceHistoryCoverage') or {}
 cc=payload.get('companyProfilesCoverage') or {}
 gilt=payload.get('gilt_history') or []
+research=[*(payload.get('companies') or []),*(payload.get('companyProfiles') or [])]
+primary_covered=sum(bool((c.get('intelligence') or {}).get('sources')) for c in research)
 indicators={
     'market quotes': (len(payload.get('quotes') or []), 70),
     'fundamental summaries': (int(fc.get('summaries') or 0), 800),
     'five-year equity price histories': (int(pc.get('fullFiveYears') or 0), 750),
     'available price histories': (int(pc.get('available') or 0), 800),
     'company profiles': (int(cc.get('profiles') or 0), 155),
+    'companies with primary-document research': (primary_covered, 80),
     'dated US Treasury prices': (len(payload.get('us_treasuries') or []), 400),
     'saved UK gilt history observations': (len(gilt), 400),
     'economic series': (len(payload.get('macro') or []), 60),
@@ -32,9 +35,8 @@ indicators={
 for name,(actual,minimum) in indicators.items():
     print(f'{name}: {actual} (minimum {minimum})')
 failed=[name for name,(actual,minimum) in indicators.items() if actual<minimum]
-# Corporate document coverage should be checked against the saved source report.
-# Some sources are unavailable without an SEC_USER_AGENT secret; never invent
-# a successful download or update the retrieved date for retained documents.
+# Only source-backed research counts. SEC_USER_AGENT is still required for fresh
+# retrievals; never fabricate a document or update its original retrieval date.
 if failed:
     raise SystemExit('Terminal 2 coverage regression: '+', '.join(failed))
 print('PASS Terminal 3 retained Terminal 2 baseline market-data coverage')
