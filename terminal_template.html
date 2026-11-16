@@ -494,7 +494,7 @@ h2{font:600 15px/1.35 var(--font);color:var(--amber);margin:0}h3{font:500 13px v
   </div>
   <p class="note" id="watchlist-note" aria-live="polite"></p>
   <div class="watchlist-table-scroll"><table class="watch"><thead><tr>
-    <th>Security</th><th>Ticker</th><th class="n">Last price</th><th class="n">Day</th><th class="n">1M TR</th><th class="n">1Y TR</th><th class="n">3Y TR p.a.</th><th class="n">5Y TR p.a.</th><th class="n">Dividend</th>
+    <th>Security</th><th>Ticker</th><th class="n">Last price</th><th class="n">Day</th><th class="n">1W TR</th><th class="n">1M TR</th><th class="n">1Y TR</th><th class="n">3Y TR p.a.</th><th class="n">5Y TR p.a.</th><th class="n">Dividend</th>
   </tr></thead><tbody id="watchlist-rows"></tbody></table></div>
   <div class="watchlist-selected-header">
     <div><h3 id="watchlist-selected-name">Select a security</h3><p class="mini" id="watchlist-selected-meta"></p></div>
@@ -2272,12 +2272,13 @@ function watchPeriodReturn(symbol,years,basis='adjusted'){
  const rows=all.filter(x=>Number(x[column])>0);
  if(rows.length<2)return null;
  const end=rows.at(-1),target=new Date(end[0]+'T12:00:00Z');
- if(years)target.setUTCFullYear(target.getUTCFullYear()-years);
+ if(years==='1W')target.setUTCDate(target.getUTCDate()-7);
+ else if(years)target.setUTCFullYear(target.getUTCFullYear()-years);
  else target.setUTCMonth(target.getUTCMonth()-1);
  const start=rows.filter(x=>Date.parse(x[0]+'T12:00:00Z')<=target).at(-1);
  if(!start||target-Date.parse(start[0]+'T12:00:00Z')>7*86400000)return null;
  const days=(Date.parse(end[0])-Date.parse(start[0]))/86400000,gross=Number(end[column])/Number(start[column]);
- return days>0&&gross>0?100*((years?Math.pow(gross,365.25/days):gross)-1):null;
+ return days>0&&gross>0?100*((typeof years==='number'&&years>1?Math.pow(gross,365.25/days):gross)-1):null;
 }
 function watchExpectedDate(now=new Date()){const d=new Date(now);d.setUTCDate(d.getUTCDate()-1);while([0,6].includes(d.getUTCDay()))d.setUTCDate(d.getUTCDate()-1);return d.toISOString().slice(0,10);}
 function watchRows(){let rows=watchlistRecords.filter(w=>(watchState.kind==='all'||w.assetType===watchState.kind)&&
@@ -2492,8 +2493,8 @@ function renderWatchlistRisk(w,q){
   ['BETA OBSERVATIONS',String(r.obs||0),'Matched daily price-return pairs in selected period'],
   ['REFERENCE INDEX',r.bench?.name||w.benchmark||'—',(r.bench?.symbol||w.benchmark||'')+' · comparison proxy']
  ];
- for(const [label,value,info] of entries)host.append(watchValTile(label,value,info));
- $('watchlist-risk-period').textContent=period+' · '+r.bars+' closes / '+r.dailyReturns+' eligible daily changes · '+(r.from||'unavailable')+' to '+(r.to||'unavailable');
+ for(const [label,value,info] of entries)if(label!=='REFERENCE INDEX')host.append(watchValTile(label,value,info));
+ $('watchlist-risk-period').textContent=period+' · Reference: '+(r.bench?.name||w.benchmark||'unavailable')+' · '+r.bars+' closes / '+r.dailyReturns+' eligible daily changes · '+(r.from||'unavailable')+' to '+(r.to||'unavailable');
  $('watchlist-risk-note').textContent=(r.enough?'':'Insufficient daily price history for '+r.label+'; no period risk statistics were estimated. ')+
   (r.benchError?'Benchmark: '+r.benchError+' ':'')+
   'Moving averages and RSI always use their latest fixed trading-day windows. Risk uses unadjusted prices; dividends are excluded.';
@@ -2554,7 +2555,7 @@ function renderWatchRows(){
   if(watchState.symbol===w.symbol)tr.classList.add('selected');
   const pct=(value)=>value==null?'—':pc(value);
   const nameCell=td(tr,shortSecurityName(w.name));nameCell.title=w.name;td(tr,w.symbol);td(tr,watchFmtQuote(q),'n');
-  td(tr,pct(q?.changePct),'n '+tone(q?.changePct));const month=watchPeriodReturn(w.symbol,0);td(tr,pct(month),'n '+tone(month));
+  td(tr,pct(q?.changePct),'n '+tone(q?.changePct));const week=watchPeriodReturn(w.symbol,'1W');td(tr,pct(week),'n '+tone(week));const month=watchPeriodReturn(w.symbol,0);td(tr,pct(month),'n '+tone(month));
   const year=watchPeriodReturn(w.symbol,1);td(tr,pct(year),'n '+tone(year));
   for(const years of [3,5]){const v=watchPeriodReturn(w.symbol,years);td(tr,pct(v),'n '+tone(v));}td(tr,pct(f?.dividendYieldPct),'n');
   const date=q?.asOf?.slice(0,10);if(!date||date<watchExpectedDate()){const flag=el('span','mini down',' · '+(date?'Quote '+date:'Quote unavailable'));tr.cells[0].append(flag);}
@@ -2562,7 +2563,7 @@ function renderWatchRows(){
   tr.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();watchState.symbol=w.symbol;renderWatchlist();}};
   body.append(tr);
  }
- if(!rows.length){const tr=el('tr'),cell=td(tr,'No securities match this search.');cell.colSpan=9;body.append(tr);}
+ if(!rows.length){const tr=el('tr'),cell=td(tr,'No securities match this search.');cell.colSpan=10;body.append(tr);}
 }
 function watchSeries(w,q){
  const rows=watchHistoryMap.get(w.symbol)||[];
@@ -2665,7 +2666,7 @@ function renderWatchlist(){
   ['FORWARD P/E',c.forwardPE==null?'—':fmt(c.forwardPE,1)+'×','Third-party forecast'],
   ['DIVIDEND YIELD',c.dividendYieldPct==null?'—':fmt(c.dividendYieldPct,2)+'%','Can lag the share-price date'],
   ['MARKET CAPITALISATION',companyAmount(c.marketCap,c.marketCapCurrency||''),'Company size, not your holding'],
-  ['52-WEEK PRICE RANGE',q?.low52==null||q?.high52==null?'—':fmt(q.low52,2)+' – '+watchFmtQuote({...q,price:q.high52}),'Exchange quote units']
+  ['52-WEEK PRICE RANGE',q?.low52==null||q?.high52==null?'—':fmt(q.low52/(['GBp','GBX'].includes(q.currency)?100:1),2)+' – '+watchFmtQuote({...q,price:q.high52}),'Exchange quote units']
  ];
  let data;
  if(w.assetType==='stock'){
