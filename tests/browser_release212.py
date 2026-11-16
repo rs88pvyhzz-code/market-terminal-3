@@ -94,7 +94,7 @@ with sync_playwright() as p:
     page.locator('#tab-companies').dispatch_event('click')
     page.locator('#research-tab-0').click()
     ids=page.locator('#research-view-0 > [id]').evaluate_all('(xs)=>xs.map(x=>x.id)')
-    assert ids.index('company-news-panel') < ids.index('company-risk-panel'),ids  # company analysis stays with the company
+    assert ids.index('company-risk-panel') < ids.index('company-news-panel'),ids  # company analysis stays with the company
     assert page.locator('#peer-panel').is_hidden(), 'Peers belong to Business & Competition, not Overview'
     page.locator('#research-tab-3').click()
     assert page.locator('#research-tab-3').get_attribute('aria-selected')=='true'
