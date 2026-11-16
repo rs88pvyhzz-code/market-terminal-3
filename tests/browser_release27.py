@@ -127,11 +127,16 @@ with sync_playwright() as p:
     # Same representative funds and viewport for visual reference comparison.
     if not data.get('demo'):
         original_path=Path(sys.argv[2]) if len(sys.argv)>2 else Path('/tmp/release27-original.html')
-        if not original_path.exists():original_path.write_bytes(urllib.request.urlopen('https://rs88pvyhzz-code.github.io/market-terminal/',timeout=60).read())
+        if not original_path.exists():
+            # The former Terminal 1 Pages URL now returns 404. Compare to this
+            # repository's last published Terminal 3 page, not a deleted site.
+            owner,project=os.environ.get('GITHUB_REPOSITORY','rs88pvyhzz-code/market-terminal-3').split('/',1)
+            baseline=f'https://{owner}.github.io/{project}/'
+            original_path.write_bytes(urllib.request.urlopen(baseline,timeout=60).read())
         original=original_path.read_text();om=re.search(r'window\.MT_DATA\s*=\s*',original);od=json.JSONDecoder().raw_decode(original[om.end():])[0];assert not od.get('demo')
         reference=browser.new_page(viewport={'width':1024,'height':768});reference.route('http://localhost:8766/**',lambda r:r.fulfill(body=original,content_type='text/html'));reference.goto('http://localhost:8766/',wait_until='domcontentloaded',timeout=120000);reference.locator('#tab-etfs').click();reference.wait_for_timeout(100)
         assert set(page.locator('#etf-tracker-panel details > summary').all_text_contents()).issubset(set(reference.locator('#etf-tracker-panel details > summary').all_text_contents()))
-        page.set_viewport_size({'width':1024,'height':768});choose(reference,'VUAG.L');choose(page,'VUAG.L');reference.locator('#etf-clear-comparisons').click();reference.locator('#etf-search').blur();page.locator('#etf-search').blur()
+        page.set_viewport_size({'width':1024,'height':768});choose(reference,'VUAG.L');choose(page,'VUAG.L');(reference.locator('#etf-clear-comparisons').click() if reference.locator('#etf-clear-comparisons').is_visible() else None);reference.locator('#etf-search').blur();page.locator('#etf-search').blur()
         # Comparisons were retired in the current layout; only the legacy reference needs clearing.
         assert not page.locator('#etf-clear-comparisons').is_visible()
         assert page.evaluate('__etf.state.compared.size')==0
@@ -158,7 +163,7 @@ with sync_playwright() as p:
         for kind in ['','table-','detail-']:
             files=[Path('/tmp/release27-'+label+'-'+kind+'ipad.png') for label in ['original','restored']]
             images=['data:image/png;base64,'+base64.b64encode(f.read_bytes()).decode() for f in files]
-            gallery.set_content('<body style="margin:0;background:#08090c;color:#dce1e7;font:16px Arial"><div style="display:grid;grid-template-columns:1024px 1024px;gap:16px;padding:8px"><div><p>Original Market Terminal · '+od['generatedAt']+'</p><img src="'+images[0]+'" style="width:100%"></div><div><p>Restored Market Terminal 2 · '+data['generatedAt']+'</p><img src="'+images[1]+'" style="width:100%"></div></div></body>');gallery.screenshot(path='/tmp/release27-side-by-side-'+(kind or 'page-')+'ipad.png',full_page=True)
+            gallery.set_content('<body style="margin:0;background:#08090c;color:#dce1e7;font:16px Arial"><div style="display:grid;grid-template-columns:1024px 1024px;gap:16px;padding:8px"><div><p>Published Terminal 3 · '+od['generatedAt']+'</p><img src="'+images[0]+'" style="width:100%"></div><div><p>Updated Terminal 3 · '+data['generatedAt']+'</p><img src="'+images[1]+'" style="width:100%"></div></div></body>');gallery.screenshot(path='/tmp/release27-side-by-side-'+(kind or 'page-')+'ipad.png',full_page=True)
         Path('/tmp/release27-visual-verification.json').write_text(json.dumps({'originalSnapshot':od['generatedAt'],'currentSnapshot':data['generatedAt'],'originalHTMLSha256':hashlib.sha256(original.encode()).hexdigest(),'currentDataSha256':hashlib.sha256(json.dumps(data,sort_keys=True).encode()).hexdigest(),'styles':comparisons},indent=2))
     browser.close()
-print('PASS Release 2.7: '+('ACTUAL PRODUCTION' if not data.get('demo') else 'DEMO')+'; Terminal 3 ten-column table/responsive widths/fonts, complete 132-fund search, two-per-benchmark, three exact alternatives, selection, currency bases/CAGR, iPad/desktop/mobile. Actual original/restored visual comparison produced when not demo.')
+print('PASS Release 2.7: '+('ACTUAL PRODUCTION' if not data.get('demo') else 'DEMO')+'; Terminal 3 ten-column table/responsive widths/fonts, complete 132-fund search, two-per-benchmark, three exact alternatives, selection, currency bases/CAGR, iPad/desktop/mobile. Actual published/updated Terminal 3 visual comparison produced when not demo.')
