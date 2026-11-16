@@ -205,8 +205,17 @@
       if(/^market signals$/i.test(h.textContent.trim())){const box=h.closest('section,.panel')||h.parentElement;box.classList.add('rd-gone')}});
     document.querySelectorAll('#r23-alerts').forEach(x=>x.classList.add('rd-gone'));
     document.querySelectorAll('#workspace-stage a,#workspace-stage button').forEach(a=>{if(/^market signals$/i.test(a.textContent.trim()))a.classList.add('rd-gone')});
+    // Keep editable research notebooks usable. Another presentation layer can
+    // turn <details> into <section>, so excluding only "closest(details)" was
+    // hiding entire input labels (and all their textareas) behind an info button.
+    document.querySelectorAll('#workspace-stage .research-notebook label.rd-gone').forEach(note=>{
+      note.classList.remove('rd-gone');delete note.dataset.rdFolded;
+    });
     document.querySelectorAll('#workspace-stage .panel .note, #workspace-stage .research-hint, #workspace-stage .mt-inline-notice').forEach(note=>{
-      if(note.dataset.rdFolded||note.closest('table,details,.rd-gone')||/synthetic|warning|error|failed|unavailable/i.test(note.className+' '+note.textContent.slice(0,60)))return;
+      if(note.matches('label,form')||note.querySelector('input,select,textarea,button,[contenteditable]')||
+         note.closest('.research-notebook,form')||
+         note.dataset.rdFolded||note.closest('table,details,.rd-gone')||
+         /synthetic|warning|error|failed|unavailable/i.test(note.className+' '+note.textContent.slice(0,60)))return;
       if(note.textContent.trim().length<40)return;
       const panel=note.closest('.panel');const head=panel&&panel.querySelector('h2,h3');if(!head)return;
       note.dataset.rdFolded='1';note.classList.add('rd-gone');
