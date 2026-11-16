@@ -247,10 +247,22 @@ def collect(core,opts):
     LATEST.write_text(json.dumps(latest,separators=(',',':'),ensure_ascii=False),encoding='utf-8')
     prior={}
     if not opts.offline:
-        try:
-            obj=_get_json(PUBLIC_HISTORY)
-            if isinstance(obj,dict):prior={k:v for k,v in obj.items() if isinstance(v,list) and re.fullmatch(r'GB[0-9A-Z]{10}',k)}
-        except Exception:pass
+        # Gilt history is a dated series. Merge the verified Terminal 2 archive
+        # with Terminal 3 rather than discarding hundreds of earlier observations.
+        sibling=f'https://{_REPO[0]}.github.io/Market-terminal-2/gilt_history_cache.json'
+        sources=(sibling,PUBLIC_HISTORY) if _REPO[1].lower()=='market-terminal-3' else (PUBLIC_HISTORY,)
+        for url in sources:
+            try:
+                obj=_get_json(url)
+                if not isinstance(obj,dict):continue
+                for k,v in obj.items():
+                    if not isinstance(v,list) or not re.fullmatch(r'GB[0-9A-Z]{10}',k):continue
+                    points={str(x[0]):float(x[1]) for x in prior.get(k,[]) if isinstance(x,list) and len(x)==2}
+                    for item in v:
+                        if isinstance(item,list) and len(item)==2:points[str(item[0])]=float(item[1])
+                    prior[k]=[[day,price] for day,price in sorted(points.items())][-1500:]
+            except Exception as exc:
+                warnings.append('Historic DMO cache unavailable: '+url+' ('+str(exc)[:65]+')')
     if HISTORY.exists():
         try:
             obj=json.loads(HISTORY.read_text('utf-8'))
