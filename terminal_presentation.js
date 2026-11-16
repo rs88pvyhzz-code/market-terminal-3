@@ -777,7 +777,7 @@ setTimeout(applyLayout,150);
       let n=0;
       for(const r of body.rows){
         const isGroup=/group|geo/.test(r.className);if(!isGroup)n++;
-        const keep=open||!over||n<=limit;
+        const keep=open||!over||n<=limit||(limit!==10&&r.matches('.etf-active,.selected,.active,[aria-selected=true]'));
         if(r.classList.contains('polish-cut')===keep)r.classList.toggle('polish-cut',!keep);
       }
       let btn=w.nextElementSibling?.classList.contains('polish-more')?w.nextElementSibling:null;
