@@ -352,11 +352,21 @@ function renderEtfTracker(){
   etfDetails();
 }
 function etfExport(){
-  const columns=['market','category','symbol','name','benchmark','terPct','replication','distribution','domicile','isin','hedged','return1Y','return3Y','return5Y','quoteStatus','note'];
+  // The CSV uses exactly the same adjusted-close convention as the visible ETF
+  // table. Never export a price-return value under a total-return heading.
+  const columns=['market','category','symbol','name','benchmark','terPct','replication','distribution','domicile','isin','hedged',
+                 'totalReturn1YAdjusted','totalReturn3YAnnualisedAdjusted','totalReturn5YAnnualisedAdjusted','returnBasis','quoteStatus','note'];
   const cell=x=>'"'+String(x==null?'':x).replace(/"/g,'""')+'"';
-  const csv=[columns.map(cell).join(','),...(typeof etfV5PickMain==='function'?etfV5PickMain().shown:etfFiltered()).map(f=>columns.map(k=>cell(f[k])).join(','))].join('\r\n');
+  const funds=typeof etfV5PickMain==='function'?etfV5PickMain().shown:etfFiltered();
+  const csv=[columns.map(cell).join(','),...funds.map(f=>{
+    const returns={'totalReturn1YAdjusted':etfPerformance(f,'1Y','adjusted_local'),
+      'totalReturn3YAnnualisedAdjusted':etfPerformance(f,'3Y','adjusted_local'),
+      'totalReturn5YAnnualisedAdjusted':etfPerformance(f,'5Y','adjusted_local')};
+    return columns.map(k=>cell(k==='returnBasis'?'Yahoo dividend/split-adjusted close, quoted currency':
+       Object.hasOwn(returns,k)?returns[k]:f[k])).join(',');
+  })].join('\\r\\n');
   const blob=new Blob([csv],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),a=el('a');
-  a.href=url;a.download='etf-trackers-'+(D.generatedAt||'snapshot').slice(0,10)+'.csv';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),250);
+  a.href=url;a.download='etf-trackers-total-return-'+(D.generatedAt||'snapshot').slice(0,10)+'.csv';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),250);
 }
 function initEtfTracker(){
   etfMarkets();
