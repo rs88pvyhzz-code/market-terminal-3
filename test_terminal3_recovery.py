@@ -48,6 +48,19 @@ class RecoveryTests(unittest.TestCase):
         self.assertEqual(set(merged['records']), {'A','B','C'})
         self.assertEqual(len(merged['records']['A']['annual']), 1)
 
+    def test_research_cache_prefers_primary_documents_to_newer_empty_records(self):
+        old = {'records': {'SHEL.L': {'schema': 5, 'documents': [
+            {'url': 'https://www.sec.gov/example', 'published': '2026-11-09'}],
+            'checkedAt': '2026-11-15T10:00:00+00:00'}}, 'attempts': {}}
+        new = {'records': {'SHEL.L': {'schema': 5, 'documents': [],
+            'checkedAt': '2026-11-16T10:00:00+00:00'}}, 'attempts': {}}
+        def get(request, timeout):
+            return io.BytesIO(json.dumps(old if '/Market-terminal-2/' in request.full_url else new).encode())
+        with patch.dict(os.environ, {'GITHUB_REPOSITORY': 'owner/market-terminal-3'}), \
+             patch.object(company_profiles.urllib.request, 'urlopen', side_effect=get):
+            cache = company_profiles._restore_published('research_intelligence_cache.json')
+        self.assertEqual(len(cache['records']['SHEL.L']['documents']), 1)
+
     def test_prices_merge_and_retain_old_start_date(self):
         old={'records': {'A': {'symbol':'A','currency':'GBP','asOf':'2026-11-15',
                                'points':[['2020-01-01',10],['2026-11-14',15],['2026-11-15',16]]},
