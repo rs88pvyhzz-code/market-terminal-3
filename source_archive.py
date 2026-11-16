@@ -58,12 +58,22 @@ def restore(root=ROOT,published=True):
     repo=os.environ.get('GITHUB_REPOSITORY','')
     if published and '/' in repo:
         owner,name=repo.split('/',1)
-        try:
-            req=urllib.request.Request(f'https://{owner}.github.io/{name}/{NAME}',headers={'User-Agent':'MarketTerminal/2.1'})
-            with urllib.request.urlopen(req,timeout=18) as r:blob=r.read(12_000_001)
-            if len(blob)>12_000_000:raise ValueError('Compressed source archive exceeds bound')
-            count+=restore_bytes(blob,root)
-        except Exception as exc:print('Published source archive unavailable; local verified cache retained: '+str(exc)[:100],flush=True)
+        sibling=f'https://{owner}.github.io/Market-terminal-2/{NAME}'
+        current=f'https://{owner}.github.io/{name}/{NAME}'
+        urls=(sibling,current) if name.lower()=='market-terminal-3' else (current,)
+        # The full primary-document archive is larger than the former 12 MB cap.
+        # Its decompressed size, document paths and hashes remain verified by restore_bytes.
+        compressed_limit=80_000_000
+        for url in urls:
+            try:
+                req=urllib.request.Request(url,headers={'User-Agent':'MarketTerminal/2.1',
+                                                        'Cache-Control':'no-cache'})
+                with urllib.request.urlopen(req,timeout=35) as r:blob=r.read(compressed_limit+1)
+                if len(blob)>compressed_limit:raise ValueError('Compressed source archive exceeds bound')
+                restored=restore_bytes(blob,root);count+=restored
+                print('Verified source archive: restored '+str(restored)+' files from '+url,flush=True)
+            except Exception as exc:
+                print('Published source archive unavailable: '+url+' ('+str(exc)[:100]+')',flush=True)
     return count
 
 def publish(root=ROOT):
