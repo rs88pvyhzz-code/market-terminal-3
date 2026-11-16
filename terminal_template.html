@@ -500,7 +500,7 @@ h2{font:600 15px/1.35 var(--font);color:var(--amber);margin:0}h3{font:500 13px v
     <div><h3 id="watchlist-selected-name">Select a security</h3><p class="mini" id="watchlist-selected-meta"></p></div>
     <button type="button" class="btn" id="watchlist-open-company">OPEN COMPANY RESEARCH</button>
   </div>
-  <div class="watchlist-kpis" id="watchlist-kpis"></div>
+  <div class="watchlist-kpis" id="watchlist-kpis"></div><div id="watchlist-return-comparison"></div>
   <div class="row"><div><h3>PERFORMANCE HISTORY</h3><label><input type="checkbox" id="watchlist-reference-toggle"> Compare with reference index</label><p id="watchlist-history-meta" class="note">Historical prices are dated closing quotations, not live prices.</p></div>
     <select class="field" id="watchlist-basis" aria-label="Select price series and currency">
       <option value="price_local">Price · quoted currency</option>
@@ -537,7 +537,7 @@ h2{font:600 15px/1.35 var(--font);color:var(--amber);margin:0}h3{font:500 13px v
     </section>
   </div>
   <details class="watchlist-advanced" id="watchlist-advanced"><summary>MORE FINANCIAL DATA — CASH FLOW, PROFITABILITY &amp; DEBT</summary><div class="watchlist-kpis" id="watchlist-extra-kpis"></div></details>
-  <p class="note" id="watchlist-source-warning">Prices and financial data can have different reporting dates and currencies. Dividend-adjusted prices are an unofficial proxy for total returns; figures are not a trading feed.</p>
+  <details class="research-detail source-provenance"><summary>Source dates, quote basis and limitations</summary><p class="note" id="watchlist-source-warning">Prices and financial data can have different reporting dates and currencies. Dividend-adjusted prices are an unofficial proxy for total returns; figures are not a trading feed.</p></details>
   <p class="note">This GitHub repository is public: the CSV discloses ticker names but never amounts held or position sizes. The saved list can be replaced at any time by editing <code>personal_watchlist.csv</code>.</p>
 </section>
 
@@ -706,7 +706,7 @@ h2{font:600 15px/1.35 var(--font);color:var(--amber);margin:0}h3{font:500 13px v
     <a id="company-source" class="company-link" target="_blank" rel="noopener noreferrer" href="https://finance.yahoo.com/">CHECK SOURCE QUOTE</a>
   </div>
     <div class="company-kpis" id="company-kpis"></div>
-  <div class="company-stat-note" id="company-dates">Price data and accounts may have different reporting dates and currencies.</div>
+  <details class="research-detail source-provenance" id="company-source-provenance"><summary>Source dates, currencies and methodology</summary><div class="company-stat-note" id="company-dates">Price data and accounts may have different reporting dates and currencies.</div></details>
   <div class="company-main">
     <div><div class="row"><h3>SHARE PRICE HISTORY</h3><span class="mini" id="company-price-date"></span></div><div class="period-controls" id="company-period"></div><p class="note" id="company-performance">Choose a time period.</p><div class="chart" id="company-chart"></div></div>
     <div class="company-fin"><h3>ANNUAL INCOME STATEMENT</h3><div id="company-annual"></div><p class="note" style="padding-top:9px">Revenue, operating profit and net profit are reported accounting figures, NOT necessarily trailing 12 months. All amounts use the company's financial reporting currency.</p></div>
@@ -2236,14 +2236,52 @@ const watchState={symbol:watchlistRecords[0]?.symbol||'',query:'',kind:'all',sor
 const WATCH_RANGES=['1M','1Y','3Y','5Y','MAX'];
 function watchProfile(symbol){return companyMap.get(symbol)||fundamentalsMap.get(symbol)||null;}
 function watchFmtQuote(q){if(!q||q.price==null)return '—';const pence=['GBp','GBX'].includes(q.currency),price=q.price/(pence?100:1);return fmt(price,2)+' '+(pence?'GBP':q.currency||'');}
-function watchPeriodReturn(symbol,years){
- const rows=(watchHistoryMap.get(symbol)||[]).filter(x=>Number(x[1])>0).slice().sort((a,b)=>a[0].localeCompare(b[0]));
- if(rows.length<2)return null;const end=rows.at(-1),target=new Date(end[0]+'T12:00:00Z');
+function watchPeriodReturn(symbol,years,basis='price'){
+ // Price and dividend-adjusted proxies use the same start date and annualisation.
+ // Never substitute a raw price when a source did not supply adjusted closes.
+ const original=watchHistoryMap.get(symbol);
+ const raw=original?.length?original:
+   basis==='adjusted'?(histMap.get(symbol)||[]).map(p=>[p.date,p.v,p.adj]):[];
+ const col=basis==='adjusted'?2:1;
+ const base=raw.filter(x=>Array.isArray(x)&&Number(x[1])>0&&/^\d{4}-\d{2}-\d{2}$/.test(x[0]))
+   .slice().sort((a,b)=>a[0].localeCompare(b[0]));
+ const rows=basis==='adjusted'?base.filter(x=>Number(x[2])>0):base;
+ if(rows.length<2||base.length<2)return null;
+ const end=rows.at(-1);
+ // The two columns must finish on the same dated closing observation. A
+ // partially saved adjusted series is not a valid same-period comparison.
+ if(basis==='adjusted'&&end[0]!==base.at(-1)[0])return null;
+ const target=new Date(end[0]+'T12:00:00Z');
  if(years)target.setUTCFullYear(target.getUTCFullYear()-years);else target.setUTCMonth(target.getUTCMonth()-1);
  const start=rows.filter(x=>Date.parse(x[0]+'T12:00:00Z')<=target).at(-1);
  if(!start||target-Date.parse(start[0]+'T12:00:00Z')>7*86400000)return null;
- const days=(Date.parse(end[0])-Date.parse(start[0]))/86400000,gross=end[1]/start[1];
- return 100*((years?Math.pow(gross,365.25/days):gross)-1);
+ if(basis==='adjusted'){
+   const originalStart=base.filter(x=>Date.parse(x[0]+'T12:00:00Z')<=target).at(-1);
+   if(!originalStart||start[0]!==originalStart[0])return null;
+ }
+ const days=(Date.parse(end[0])-Date.parse(start[0]))/86400000,gross=Number(end[col])/Number(start[col]);
+ return days>0&&gross>0?100*((years?Math.pow(gross,365.25/days):gross)-1):null;
+}
+function renderReturnBasisComparison(symbol,host){
+ if(!host)return;
+ host.replaceChildren();
+ const entries=[1,3,5].map(y=>({y,price:watchPeriodReturn(symbol,y),
+   adjusted:watchPeriodReturn(symbol,y,'adjusted')}));
+ if(!entries.some(x=>x.price!=null||x.adjusted!=null))return;
+ const section=el('section','return-basis-comparison');
+ section.append(el('h3','','PRICE RETURN VS ADJUSTED RETURN PROXY'));
+ const table=el('table','watch return-basis-table'),head=el('thead'),headers=el('tr');
+ for(const label of ['Period','Price only','Adjusted-close proxy'])headers.append(el('th','',label));
+ head.append(headers);table.append(head);
+ const body=el('tbody');
+ for(const row of entries){
+   const tr=el('tr');tr.append(el('td','',row.y+'Y'+(row.y>1?' p.a.':'')));
+   for(const value of [row.price,row.adjusted])tr.append(el('td','n '+(value==null?'':tone(value)),value==null?'—':pc(value)));
+   body.append(tr);
+ }
+ table.append(body);section.append(table);
+ section.append(el('p','mini','Price returns exclude dividends. Yahoo adjusted closes are a dividend/split-adjusted total-return proxy, not independently verified investor returns. Same quoted currency; periods over one year are annualised. Missing adjusted data stays blank.'));
+ host.append(section);
 }
 function watchExpectedDate(now=new Date()){const d=new Date(now);d.setUTCDate(d.getUTCDate()-1);while([0,6].includes(d.getUTCDay()))d.setUTCDate(d.getUTCDate()-1);return d.toISOString().slice(0,10);}
 function watchRows(){let rows=watchlistRecords.filter(w=>(watchState.kind==='all'||w.assetType===watchState.kind)&&
@@ -2656,6 +2694,7 @@ function renderWatchlist(){
  for(const [label,value,info] of data.slice(0,keyCount))kpis.append(watchValTile(label,value,info));
  const extra=$('watchlist-extra-kpis');extra.replaceChildren();for(const [label,value,info] of data.slice(keyCount))extra.append(watchValTile(label,value,info));
  $('watchlist-advanced').hidden=!extra.children.length;
+ renderReturnBasisComparison(w.symbol,$('watchlist-return-comparison'));
  const btn=$('watchlist-open-company');const research=w.assetType!=='fund'&&(companyMap.has(w.symbol)||indexedStocks.has(w.symbol));
  btn.textContent=research?'OPEN COMPANY RESEARCH':w.assetType==='fund'?'OPEN VANGUARD FUNDS':'OPEN SOURCE QUOTE';
  btn.onclick=()=>research?openConstituent(w.symbol):window.open(w.assetType==='fund'?'https://www.vanguardinvestor.co.uk/investments':'https://finance.yahoo.com/quote/'+encodeURIComponent(w.symbol)+'/','_blank','noopener,noreferrer');

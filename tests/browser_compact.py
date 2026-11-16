@@ -100,7 +100,7 @@ with sync_playwright() as p:
             assert page.locator('#view-quality').is_visible()
             page.locator('#tab-companies').dispatch_event('click');page.locator('#research-tab-0').click()
 
-        assert ids.index('company-news-panel')<ids.index('company-price-block')<ids.index('company-risk-panel')
+        assert ids.index('company-price-block')<ids.index('company-risk-panel')<ids.index('company-news-panel')
         if data.get('demo'):
             assert 'Quarterly results' in page.locator('#company-news-list article').first.inner_text()
             # Guidance changes and latest-results block retired: headlines only.
