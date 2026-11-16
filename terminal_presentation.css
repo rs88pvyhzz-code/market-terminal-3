@@ -660,3 +660,46 @@ details.period-dates .time-box{margin-top:7px}
 @media(max-width:620px){
   #workspace-stage #macro-tiles .t3-econ-delta{font-size:12px}
 }
+
+/* Release B: concise research hierarchy, reliable return-basis comparison. */
+#workspace-stage .layout-metrics .layout-secondary-metric{display:none!important}
+#workspace-stage .layout-metrics[data-more-metrics="yes"] .layout-secondary-metric{
+  display:block!important
+}
+#workspace-stage .layout-metrics .layout-more-metrics{
+  grid-column:1/-1;justify-self:start;margin:8px 0 3px;
+  border-color:#44637d!important;color:#d2e9fa!important;
+  background:#182536!important;font-size:12px
+}
+#workspace-stage .return-basis-comparison{
+  border-top:1px solid #324052;
+  margin:15px 0 12px;padding:12px 0 5px;max-width:100%
+}
+#workspace-stage .return-basis-comparison h3{
+  color:#e9bd78!important;font-size:13px;margin:0 0 8px
+}
+#workspace-stage .return-basis-table{width:100%;table-layout:fixed}
+#workspace-stage .return-basis-table :is(th,td){padding:8px 10px;font-variant-numeric:tabular-nums}
+#workspace-stage .return-basis-table th:first-child{width:26%}
+#workspace-stage .return-basis-table th:not(:first-child),
+#workspace-stage .return-basis-table td:not(:first-child){text-align:right}
+#workspace-stage .return-basis-comparison .mini{
+  margin:7px 0 0;color:#aab9c9;font-size:11px;line-height:1.45
+}
+#workspace-stage .research-primary-sources{
+  display:flex;align-items:center;flex-wrap:wrap;gap:7px 15px;
+  margin:11px 0 9px;border-top:1px solid #304159;padding-top:9px
+}
+#workspace-stage .research-primary-sources>strong{
+  font:600 11px/1.4 var(--reading-sans,-apple-system,sans-serif);
+  color:#f0b35a
+}
+#workspace-stage .research-primary-sources a{
+  color:#9cdaff!important;text-decoration:underline;
+  font-size:12px;font-weight:600
+}
+#workspace-stage #watchlist-freshness[hidden]{display:none!important}
+@media(max-width:650px){
+  #workspace-stage .return-basis-table :is(th,td){padding:7px 4px;font-size:11px}
+  #workspace-stage .research-primary-sources a{font-size:11px}
+}
