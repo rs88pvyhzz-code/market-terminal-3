@@ -54,7 +54,7 @@ with sync_playwright() as playwright:
         assert page.locator('#etf-period').is_visible(),('period selector missing',width)
         assert page.locator('#etf-benchmark').is_visible(),('benchmark selector missing',width)
         assert page.locator('#layout-etf-performance #etf-period').count()==1,('controls separated from chart',width)
-        assert page.locator('#etf-period option').evaluate_all('(items)=>items.map(i=>i.value)')==['1M','1Y','3Y','5Y','MAX']
+        assert page.locator('#etf-period option').evaluate_all('(items)=>items.map(i=>i.value)')==['1W','1M','1Y','3Y','5Y','MAX']
         assert page.locator('#etf-benchmark').input_value()=='AUTO'
         print('BENCHMARK SELECTOR',width,'SELECTED',page.locator('#etf-selected').text_content(),
               'AUTO',page.locator('#etf-benchmark option').first.text_content(),
@@ -67,7 +67,7 @@ with sync_playwright() as playwright:
         assert 'S&P 500' in page.locator('#etf-relative-outcome').inner_text()
         page.locator('#etf-benchmark').select_option('FTSE250')
         assert 'FTSE 250' in page.locator('#etf-relative-outcome').inner_text()
-        for period in ['1M','1Y','3Y','5Y','MAX']:
+        for period in ['1W','1M','1Y','3Y','5Y','MAX']:
             page.locator('#etf-period').select_option(period)
             assert page.locator('#etf-chart svg path[stroke-width]').count()>=2,('period graph',width,period)
             assert period in page.locator('#etf-chart-stamp').inner_text(),period
@@ -75,14 +75,14 @@ with sync_playwright() as playwright:
         # A fund's published TR must use adjusted data, not the raw price.
         row=page.locator('#etf-rows tr[data-etf-symbol="SPOL.L"]')
         assert row.count()==1
-        value=row.locator('td').nth(6).text_content()
+        value=row.locator('td').nth(7).text_content()
         assert '%' in value,(width,value)
         assert page.evaluate('document.documentElement.scrollWidth<=window.innerWidth+1'),('body overflow',width)
         if width<700:
             assert page.locator('.etf-table-scroll').evaluate('(e)=>e.scrollWidth<=e.clientWidth+1'),('ETF sideways scroll',width)
-            assert page.locator('#etf-rows tr[data-etf-symbol="SPOL.L"] td').nth(6).is_visible()
             assert page.locator('#etf-rows tr[data-etf-symbol="SPOL.L"] td').nth(7).is_visible()
             assert page.locator('#etf-rows tr[data-etf-symbol="SPOL.L"] td').nth(8).is_visible()
+            assert page.locator('#etf-rows tr[data-etf-symbol="SPOL.L"] td').nth(9).is_visible()
             assert page.locator('#workspace-tabs').evaluate('(e)=>e.scrollWidth>e.clientWidth'),('mobile tab navigation',width)
         page.screenshot(path=f'/tmp/etf-total-return-{width}.png')
         assert not errors,(width,errors)
@@ -100,7 +100,7 @@ with sync_playwright() as playwright:
     page.locator('#etf-search').fill('SPOL.L')
     page.locator('#etf-rows [data-etf-symbol="SPOL.L"]').click()
     row=page.locator('#etf-rows tr[data-etf-symbol="SPOL.L"]')
-    assert row.locator('td').nth(6).text_content().strip()=='—'
+    assert row.locator('td').nth(7).text_content().strip()=='—'
     assert 'No adjusted-price' in page.locator('#etf-chart').inner_text()
     browser.close()
 print('PASS: ETF 1M/1Y/3Y/5Y/MAX, S&P/FTSE/global total-return proxies, truthful missing data, phone/tablet/desktop')
