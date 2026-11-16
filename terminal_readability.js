@@ -163,7 +163,7 @@
       if(n.parentElement.closest('input,select,textarea,script,style,option'))continue;todo.push(n)}
     todo.forEach(n=>{let v=n.nodeValue;
       v=v.replace(RE1,(m,c,x)=>SYM[c]+x.replace(/\s/g,'')).replace(RE2,(m,pre,x,c)=>pre+SYM[c]+x.replace(/\s/g,''));
-      v=v.replace(/\bGBp\b/g,'GBP');
+      // Keep GBp as pence. Rendering routines must divide by 100 before showing GBP.
       if(v!==n.nodeValue)n.nodeValue=v});
   }
   // Header follows its column: numeric columns right-aligned, text columns left.
