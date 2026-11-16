@@ -30,15 +30,35 @@ def _restore_published(filename=CACHE_NAME):
     if '/' not in repo:
         return {}
     owner, name = repo.split('/', 1)
+    # Seed from Terminal 2, then overlay Terminal 3's newer or more complete records.
+    # Both the host path and its spelling are significant on GitHub Pages.
+    current = f'https://{owner}.github.io/{name}/{filename}'
+    sibling = f'https://{owner}.github.io/Market-terminal-2/{filename}'
+    urls = (sibling, current) if name.lower() == 'market-terminal-3' else (current,)
     best = {}
-    for url in (f'https://{owner}.github.io/{name}/{filename}',
-                f'https://rs88pvyhzz-code.github.io/market-terminal-2/{filename}'):
+    for url in urls:
         try:
             req = urllib.request.Request(url, headers={'User-Agent': 'PersonalMarketResearch/1.1',
                                                        'Cache-Control': 'no-cache'})
-            with urllib.request.urlopen(req, timeout=18) as r:
-                data = json.loads(r.read(20_000_000).decode('utf-8'))
-            if isinstance(data, dict) and len(data) > len(best):
+            with urllib.request.urlopen(req, timeout=22) as r:
+                data = json.loads(r.read(30_000_001).decode('utf-8'))
+            if not isinstance(data, dict):
+                continue
+            if isinstance(data.get('records'), dict):
+                if not best:
+                    best = {'records': {}, 'attempts': {}}
+                for symbol, record in data['records'].items():
+                    if not isinstance(record, dict):
+                        continue
+                    old = best['records'].get(symbol)
+                    score = lambda row: (len(row.get('annual') or []), sum(v is not None for v in row.values()), str(row.get('asOf') or ''))
+                    if not isinstance(old, dict) or score(record) >= score(old):
+                        best['records'][symbol] = record
+                for symbol, when in (data.get('attempts') or {}).items():
+                    if str(when) > str(best['attempts'].get(symbol, '')):
+                        best['attempts'][symbol] = when
+            elif len(data) > len(best):
+                # The research valuation cache has a different schema.
                 best = data
         except Exception as exc:
             print('Company profiles: no published cache at ' + url + ' (' + str(exc)[:80] + ')', flush=True)
