@@ -558,7 +558,7 @@ h2{font:600 15px/1.35 var(--font);color:var(--amber);margin:0}h3{font:500 13px v
   <div class="etf-table-scroll"><table class="watch etf-table"><thead><tr>
     <th>Fund / market</th><th>Ticker</th><th>Benchmark</th><th class="n">TER %</th><th>Replication</th><th>Pay-out</th><th class="n">Last price</th><th class="n">1Y*</th><th class="n">3Y*</th><th class="n">5Y*</th><th>Quote</th><th>Compare</th>
   </tr></thead><tbody id="etf-rows"></tbody></table></div>
-  <p class="note">*Annualised historical performance in each fund's quoted currency, using Yahoo adjusted-close where supplied, otherwise price only. Not directly comparable across different currencies and not independently verified total returns. Unknown fees and replication methods are shown as unavailable, never zero.</p>
+  <p class="note">*One-year return and annualised three/five-year returns use dividend-adjusted closing prices only. When adjusted prices are absent, the return is unavailable rather than silently switching to price only. Each fund's quoted currency; currency conversion is needed for a fair cross-market comparison. Unknown fees and replication methods are shown as unavailable, never zero.</p>
   <section class="etf-detail" aria-label="Selected ETF research">
     <div class="row"><div><h3 id="etf-selected">Select a fund</h3><p class="mini" id="etf-selected-meta"></p></div>
       <div class="inputs"><a id="etf-facts-link" target="_blank" rel="noopener noreferrer" href="https://www.justetf.com/uk/">VERIFY FUND FACTS</a><a id="etf-quote-link" target="_blank" rel="noopener noreferrer" href="https://finance.yahoo.com/">QUOTE SOURCE</a></div></div>
@@ -566,13 +566,13 @@ h2{font:600 15px/1.35 var(--font);color:var(--amber);margin:0}h3{font:500 13px v
     <p class="note" id="etf-warning"></p>
     <div class="row"><h3>HISTORICAL PERFORMANCE COMPARISON</h3><span class="mini" id="etf-chart-stamp"></span></div>
     <div class="etf-plot-controls inputs">
-      <label>PERIOD<select id="etf-period" class="field"><option value="1Y">1 year</option><option value="3Y">3 years</option><option value="5Y" selected>5 years</option><option value="10Y">10 years</option><option value="MAX">Maximum</option></select></label>
+      <label>PERIOD<select id="etf-period" class="field" aria-label="ETF comparison period"><option value="1M">1 month</option><option value="1Y">1 year</option><option value="3Y">3 years</option><option value="5Y" selected>5 years</option><option value="MAX">Maximum</option></select></label>
       <label>BASIS<select id="etf-basis" class="field"><option value="adjusted_gbp">Adjusted-close proxy in GBP</option><option value="price_gbp">Price only in GBP</option><option value="adjusted_local">Adjusted-close proxy in quoted currency</option><option value="price_local">Price only in quoted currency</option></select></label>
-      <label class="etf-check-label"><input id="etf-reference" type="checkbox"> Add market index/reference</label>
+      <label class="etf-benchmark-control">COMPARE WITH<select id="etf-benchmark" class="field" aria-label="Compare ETF against a market total return benchmark proxy"><option value="AUTO">Suggested market benchmark</option></select></label><label class="etf-legacy-check" hidden><input id="etf-reference" type="checkbox" checked> Include comparison</label>
       <button id="etf-clear-comparisons" class="btn" type="button">CLEAR COMPARISONS</button>
     </div>
-    <div class="chart" id="etf-chart" role="img" aria-label="Selected ETFs rebased to 100"></div>
-    <p class="note" id="etf-chart-note">A chart reference may be a price index, performance index or another ETF. Its methodology may differ from the fund benchmark; this is NOT an official tracking-difference calculation. Total return, FX and distributions require separate verification.</p>
+    <div class="chart" id="etf-chart" role="img" aria-label="ETF and selected benchmark total returns, rebased to 100"></div><div id="etf-relative-outcome" class="etf-relative-outcome" aria-live="polite"></div>
+    <p class="note" id="etf-chart-note">Both series use Yahoo dividend-adjusted closing prices and dated sterling conversion when available. Benchmark lines are investable ETF proxies, not official index total-return series. Missing data are shown, never invented.</p>
     <div class="row"><h3>RISK, COST &amp; PEERS</h3><span class="mini">Risk uses observed price history, not models</span></div>
     <div class="etf-stat-grid" id="etf-risk-stats"></div>
     <div class="etf-peer-box" id="etf-index-comparison"><h3>SAME-INDEX ETF COMPARISON</h3><div class="inputs"><label>INDEX <select id="etf-same-index-benchmark" class="field"></select></label></div><div id="etf-same-index" class="small-scroll"></div><p class="note" id="etf-same-index-note"></p></div>
