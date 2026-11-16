@@ -56,6 +56,10 @@ with sync_playwright() as playwright:
         assert page.locator('#layout-etf-performance #etf-period').count()==1,('controls separated from chart',width)
         assert page.locator('#etf-period option').evaluate_all('(items)=>items.map(i=>i.value)')==['1M','1Y','3Y','5Y','MAX']
         assert page.locator('#etf-benchmark').input_value()=='AUTO'
+        print('BENCHMARK SELECTOR',width,'SELECTED',page.locator('#etf-selected').text_content(),
+              'AUTO',page.locator('#etf-benchmark option').first.text_content(),
+              'OPTIONS',page.locator('#etf-benchmark option').all_text_contents(),flush=True)
+        assert 'SPOL.L' in page.locator('#etf-selected').text_content(),('selection did not change',width)
         assert 'VWRP' in page.locator('#etf-benchmark option').first.text_content()
         assert page.locator('#etf-chart svg path[stroke-width]').count()>=2,('ETF and reference need two lines',width)
         assert 'vs FTSE All-World' in page.locator('#etf-relative-outcome').inner_text(),width
