@@ -13,7 +13,7 @@ import urllib.request
 ROOT=Path(__file__).resolve().parent
 NAME='primary_source_archive.json.gz'
 PREFIXES=('.terminal_filings/','.terminal_research/documents/')
-MAX_SIZE=110_000_000
+MAX_SIZE=350_000_000
 
 def pack(root=ROOT):
     entries={}
