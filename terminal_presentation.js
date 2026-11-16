@@ -50,8 +50,8 @@ const ANALYTICS=[
 // in the research view where it is read. Listed panels are placed first, in order;
 // anything else in the view (e.g. the full metrics grid) follows them.
 const RESEARCH={
-  'research-view-0':['research-overview','company-news-panel','company-price-block',
-                     'company-benchmark-block','company-risk-panel','company-advanced','research-executive'],
+  'research-view-0':['research-overview','company-price-block','company-benchmark-block',
+                     'company-risk-panel','company-news-panel','company-advanced','research-executive'],
   'research-view-3':['peer-panel'],
   'research-view-5':['research-warning-priority','forensic-panel']
 };
