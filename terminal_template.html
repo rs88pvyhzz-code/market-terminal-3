@@ -2243,13 +2243,22 @@ function watchPeriodReturn(symbol,years,basis='price'){
  const raw=original?.length?original:
    basis==='adjusted'?(histMap.get(symbol)||[]).map(p=>[p.date,p.v,p.adj]):[];
  const col=basis==='adjusted'?2:1;
- const rows=raw.filter(x=>Array.isArray(x)&&Number(x[col])>0&&/^\d{4}-\d{2}-\d{2}$/.test(x[0]))
+ const base=raw.filter(x=>Array.isArray(x)&&Number(x[1])>0&&/^\d{4}-\d{2}-\d{2}$/.test(x[0]))
    .slice().sort((a,b)=>a[0].localeCompare(b[0]));
- if(rows.length<2)return null;
- const end=rows.at(-1),target=new Date(end[0]+'T12:00:00Z');
+ const rows=basis==='adjusted'?base.filter(x=>Number(x[2])>0):base;
+ if(rows.length<2||base.length<2)return null;
+ const end=rows.at(-1);
+ // The two columns must finish on the same dated closing observation. A
+ // partially saved adjusted series is not a valid same-period comparison.
+ if(basis==='adjusted'&&end[0]!==base.at(-1)[0])return null;
+ const target=new Date(end[0]+'T12:00:00Z');
  if(years)target.setUTCFullYear(target.getUTCFullYear()-years);else target.setUTCMonth(target.getUTCMonth()-1);
  const start=rows.filter(x=>Date.parse(x[0]+'T12:00:00Z')<=target).at(-1);
  if(!start||target-Date.parse(start[0]+'T12:00:00Z')>7*86400000)return null;
+ if(basis==='adjusted'){
+   const originalStart=base.filter(x=>Date.parse(x[0]+'T12:00:00Z')<=target).at(-1);
+   if(!originalStart||start[0]!==originalStart[0])return null;
+ }
  const days=(Date.parse(end[0])-Date.parse(start[0]))/86400000,gross=Number(end[col])/Number(start[col]);
  return days>0&&gross>0?100*((years?Math.pow(gross,365.25/days):gross)-1):null;
 }
