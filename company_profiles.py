@@ -51,7 +51,7 @@ def _restore_published(filename=CACHE_NAME):
                     if not isinstance(record, dict):
                         continue
                     old = best['records'].get(symbol)
-                    score = lambda row: (len(row.get('annual') or []), sum(v is not None for v in row.values()), str(row.get('asOf') or ''))
+                    score = lambda row: (len(row.get('documents') or []), len(row.get('annual') or []), sum(v is not None for v in row.values()), str(row.get('checkedAt') or row.get('asOf') or ''))
                     if not isinstance(old, dict) or score(record) >= score(old):
                         best['records'][symbol] = record
                 for symbol, when in (data.get('attempts') or {}).items():
