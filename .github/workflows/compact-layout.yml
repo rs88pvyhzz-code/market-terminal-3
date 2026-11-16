@@ -8,7 +8,9 @@ permissions:
 jobs:
   visual:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # This suite checks demo + real snapshot at seven device sizes; 15 minutes
+    # cancelled a fully passing run during final artifact/upload cleanup.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
