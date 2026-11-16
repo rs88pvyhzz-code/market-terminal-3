@@ -23,6 +23,16 @@ class Manifest(unittest.TestCase):
         self.assertIn('function mergeSnapshot(', js)
         self.assertEqual(js.count('function t3SemanticColours()'), 1)
 
+    def test_live_etf_uses_maintained_benchmark_source_once(self):
+        template=(build_terminal.ROOT/'terminal_template.html').read_text('utf-8')
+        actual=build_terminal.assemble_frontend(template)
+        self.assertEqual(actual.count('const ETF_DATA = D.etfTracker'),1)
+        self.assertEqual(actual.count('function etfBenchmarkChoices(){'),1)
+        self.assertEqual(actual.count('function etfRefreshBenchmarkSelect(f){'),1)
+        self.assertIn('etf-benchmark',actual)
+        self.assertIn('function etfMatchedGap(',actual)
+        self.assertNotIn('Index/reference series may use a different dividend method',actual)
+
     def test_missing_insertion_point_stops_the_build(self):
         with self.assertRaises(SystemExit):
             build_terminal.assemble_frontend('<html><head></head><body>no markers</body></html>')

@@ -180,7 +180,7 @@ function tagAnonymous(){
   wrapEtf('layout-etf-performance',detail,()=>{
     const chartEl=$L('etf-chart');if(!chartEl)return [];
     const head=$L('etf-chart-stamp')?.closest('div');
-    return [head,chartEl,$L('etf-chart-note')].filter(Boolean);
+    return [head,detail?.querySelector('.etf-plot-controls'),chartEl,$L('etf-relative-outcome'),$L('etf-chart-note')].filter(Boolean);
   });
   wrapEtf('layout-etf-risk',detail,()=>{
     const stats=$L('etf-risk-stats');if(!stats)return [];

@@ -13,7 +13,8 @@ import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-DEMO_ONLY = {'browser_research_release1.py', 'browser_research_release2.py', 'browser_release22.py'}
+DEMO_ONLY = {'browser_research_release1.py', 'browser_research_release2.py', 'browser_release22.py',
+             'browser_etf_total_return_mobile.py'}  # synthetic fixture: runs in compact-layout CI
 LIVE_ONLY = {'browser_research_live.py'}
 
 p = argparse.ArgumentParser()

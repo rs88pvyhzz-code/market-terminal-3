@@ -735,6 +735,16 @@ def _inject_once(template, marker, text, label):
 
 
 def assemble_frontend(template):
+    # Terminal's historical template still embeds a legacy ETF frontend.
+    # Use the maintained ETF source exactly once, inside the same app scope.
+    # Without this, edits to etf_frontend.js never reach the live terminal.
+    etf_start='const ETF_DATA = D.etfTracker || {funds:[],history:[],coverage:{}};'
+    etf_end='// ETF CHARGES + INDICATIVE TRACKING ERROR'
+    if template.count(etf_start)!=1 or template.count(etf_end)!=1:
+        raise SystemExit('Expected a unique inline ETF frontend and subsequent analytics boundary')
+    lo=template.index(etf_start)
+    hi=template.index(etf_end,lo)
+    template=template[:lo]+_asset('etf_frontend.js').rstrip()+'\n\n'+template[hi:]
     template = _inject_once(template, '/*__EQUITY_RESEARCH__*/',
                             '\n'.join(_asset(f) for f in FRONTEND_EARLY_JS), 'early scripts')
     template = _inject_once(template, '\ninit();\n',
