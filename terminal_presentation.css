@@ -787,3 +787,14 @@ details.period-dates .time-box{margin-top:7px}
  #workspace-stage #etf-tracker-panel .etf-table :is(th,td):nth-child(9){width:15%!important}
  #workspace-stage #etf-tracker-panel .etf-table :is(th,td):nth-child(10){width:9%!important}
 }
+
+/* November table review: all return headings and cells share one layout. */
+#workspace-stage #etf-tracker-panel .etf-table-scroll{overflow-x:auto!important}
+#workspace-stage #etf-tracker-panel .etf-table{min-width:1080px!important;table-layout:auto!important}
+#workspace-stage #etf-tracker-panel .etf-table :is(th,td):nth-child(n){display:table-cell!important;width:auto!important;white-space:nowrap}
+#workspace-stage #etf-tracker-panel .etf-table :is(th,td):first-child{min-width:260px;white-space:normal}
+#workspace-stage #etf-tracker-panel .etf-table :is(th,td):nth-child(11){text-align:center!important}
+.company-standalone-price{display:none!important}
+.credit-stat .metric-risk{color:#83d4ff!important}
+#watch-rows td{vertical-align:middle}
+#watch-rows td:nth-child(10){min-width:155px}
