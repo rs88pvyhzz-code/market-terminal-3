@@ -74,7 +74,7 @@ function etfPerformance(f,range='1Y',basis=etfState.basis){
   const elapsed=(Date.parse(all.at(-1).date+'T12:00:00Z')-Date.parse(all[0].date+'T12:00:00Z'))/86400000/365.25;
   const years=range==='1Y'?1:range==='3Y'?3:range==='5Y'?5:range==='10Y'?10:0;
   if(years&&elapsed<years*0.90)return null;
-  return 100*(Math.pow(all.at(-1).v/all[0].v,1/Math.max(elapsed,1/365.25))-1);
+  return 100*((years>1?Math.pow(all.at(-1).v/all[0].v,1/Math.max(elapsed,1/365.25)):all.at(-1).v/all[0].v)-1);
 }
 function etfRisk(f){
   const one=etfRows(f,'1Y',etfState.basis),period=etfRows(f,etfState.range,etfState.basis),returns=[];
@@ -201,6 +201,7 @@ function etfDrawDifference(sets,primary,symbols){
  });
 }
 function etfDrawChart(){
+ document.querySelectorAll('.etf-investment-summary').forEach(n=>n.remove());
  const primary=ETF_BY_SYMBOL.get(etfState.selected),stamp=$('etf-chart-stamp'),
    outcome=$('etf-relative-outcome'),note=$('etf-chart-note');
  if(!primary){empty('etf-chart','No ETF selected');if(outcome)outcome.textContent='';return;}
@@ -264,8 +265,17 @@ function etfDrawChart(){
      color:src.reference?AQUA:(i===0?AMBER:PALETTE[i%PALETTE.length]),
      pts:days.map(date=>({date,v:100*prices.get(date)/base}))};
  });
- chart('etf-chart',sets,{height:290,format:v=>fmt(v,1),
-   aria:'Reinvested-distribution ETF performance, each series indexed to 100 on '+days[0]});
+ const sterlingInvestment=etfState.basis==='adjusted_gbp';
+ const displaySets=sterlingInvestment?sets.map(s=>({...s,pts:s.pts.map(p=>({...p,v:p.v*100}))})):sets;
+ chart('etf-chart',displaySets,{height:290,format:v=>sterlingInvestment?'£'+fmt(v,0):fmt(v,1),
+   aria:sterlingInvestment?'Value of £10,000 invested with distributions reinvested':'ETF indexed performance'});
+ if(sterlingInvestment){
+  const value=sets[0].pts.at(-1).v*100,gain=value-10000;
+  const summary=el('div','etf-investment-summary');
+  summary.append(el('strong','','£10,000 invested → £'+fmt(value,0)),el('span',tone(gain),' · '+(gain>=0?'+':'−')+'£'+fmt(Math.abs(gain),0)+' ('+pc(gain/100)+')'));
+  summary.append(el('p','note','Historical illustration · dividends reinvested · GBP · excludes dealing costs and tax. No trade is placed.'));
+  $('etf-chart').before(summary);
+ }
  try{etfDrawDifference(sets,primary,symbols);}catch(e){
    console.warn('ETF difference chart unavailable',e);rejected.push('Peer difference chart could not be rendered');
  }
@@ -283,7 +293,7 @@ function etfDrawChart(){
      outcome.className='etf-relative-outcome '+(move>0?'pos':move<0?'neg':'');
    }else{outcome.textContent=etfState.benchmark==='NONE'?'No benchmark selected':'Benchmark unavailable for these dated observations';outcome.className='etf-relative-outcome';}
  }
- if(note)note.textContent='Indexed to 100 on '+datefmt(days[0])+' · through '+datefmt(days.at(-1))+
+ if(note)note.textContent=(sterlingInvestment?'£10,000 invested on ':'Indexed to 100 on ')+datefmt(days[0])+' · through '+datefmt(days.at(-1))+
    ' · '+days.length+' exact matched trading dates'+(limited?' · PARTIAL '+etfState.range+' HISTORY':'')+
    '. '+(etfState.basis.startsWith('adjusted')?'Yahoo adjusted close is an unofficial total-return proxy. ':'Price-only diagnostic view excludes dividends. ')+
    (etfState.basis.endsWith('gbp')?'Both sides converted at dated FX observations. ':'Both sides must share their trading currency. ')+
