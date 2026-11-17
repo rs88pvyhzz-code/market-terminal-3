@@ -56,7 +56,7 @@ with sync_playwright() as p:
         assert page.locator('#research-valuation button').count()==0
         assert 'Trailing P/E' in page.locator('#research-valuation').inner_text()
         page.locator('#research-tab-0').click();page.wait_for_timeout(80)
-        assert page.locator('#company-chart').is_visible()
+        assert page.locator('#company-benchmark-chart').is_visible() and not page.locator('#company-chart').is_visible()
         assert page.locator('#company-risk-kpis').is_visible()  # company risk stays in Company Research
         assert page.locator('#research-overview details').count()==0
         assert page.locator('#research-view-0 #company-advanced').count()==1 and page.locator('#company-advanced').evaluate('(e)=>e.tagName')=='SECTION'
