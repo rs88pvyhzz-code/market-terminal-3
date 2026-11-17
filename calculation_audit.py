@@ -26,8 +26,10 @@ SCHEMA_VERSION = 1
 PUBLIC_KEYS = ("quotes", "history", "uk_rates", "us_rates", "eu_rates",
                "macro", "gilts", "gilt_history", "us_treasuries",
                "us_treasury_history", "marketAnalytics", "etfTracker")
-METHOD_FILES = ("return_risk.py", "market_analytics.py", "etf_tracker.py",
+METHOD_FILES = ("build_terminal.py", "build_site.py", "calculation_audit.py",
+                "return_risk.py", "market_analytics.py", "etf_tracker.py",
                 "etf_metrics.py", "terminal_template.html",
+                "terminal_presentation.js", "etf_frontend.js",
                 "terminal_research_upgrade.js")
 REFERENCE_SYMBOLS = ("^FTSE", "^FTMC", "^GSPC", "^IXIC", "SPY", "QQQ")
 MAX_PUBLISHED_RECORDS = 400
@@ -69,12 +71,17 @@ def _section(raw):
             "latestSourceObservation": max(dates) if dates else None}
 
 
-def reference_checks(history):
+def reference_checks(history, quotes=None):
     """Independent, appropriately labelled close-to-close cross-checks.
 
     These are *audit samples*, not NAV metrics and not replacements for
     calculated values displayed elsewhere. For missing/sparse data show null.
     """
+    quote_currencies = {
+        q.get("symbol"): q.get("currency")
+        for q in (quotes or []) if isinstance(q, dict) and
+        q.get("symbol") in REFERENCE_SYMBOLS
+    }
     history_by_symbol = defaultdict(dict)
     for p in history or []:
         if not isinstance(p, dict) or p.get("symbol") not in REFERENCE_SYMBOLS:
@@ -107,7 +114,11 @@ def reference_checks(history):
                 dt.date.fromisoformat(recent[0][0])).days >= 295:
             volatility = return_risk.annualized_metrics(moves)["volatility"]
         output.append({
-            "symbol": symbol, "lastCloseDate": p[-1][0],
+            "symbol": symbol,
+            "currency": quote_currencies.get(symbol),
+            "firstCloseDate": recent[0][0],
+            "lastCloseDate": p[-1][0],
+            "calendarDaysObserved": (last_date - dt.date.fromisoformat(recent[0][0])).days,
             "closeToClosePriceReturnPct": round(moves[-1] * 100, 6) if
                 valid_gaps and clean_moves else None,
             "annualizedPriceVolatilityPct": (
@@ -170,7 +181,9 @@ def create_record(payload, *, method_root, run_id=None, run_attempt=None,
         },
         "validationCounters": counters,
         "warningCount": len(payload.get("warnings") or []),
-        "independentPriceRiskSamples": reference_checks(payload.get("history")),
+        "independentPriceRiskSamples": reference_checks(
+            payload.get("history"), payload.get("quotes")
+        ),
         "privacy": "Public-market metadata only. No portfolios, holdings, account identifiers or personal weights.",
     }
     # Include section hashes rather than the underlying quotes/prices in this
