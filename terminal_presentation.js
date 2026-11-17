@@ -467,7 +467,19 @@ function renderBondTabs(){
   const view=$L('view-bonds');if(!view)return;
   let nav=$L('layout-bond-tabs');
   if(!nav){nav=document.createElement('nav');nav.id='layout-bond-tabs';nav.className='layout-subtabs';
-    BOND_TABS.forEach(([label],i)=>{const b=document.createElement('button');b.type='button';b.className='btn';b.textContent=label;b.onclick=()=>{bondTab=i;renderBondTabs();try{paintWorkspace('bonds');}catch(e){}window.scrollTo({top:Math.max(0,view.offsetTop-80)});};nav.append(b);});}
+    BOND_TABS.forEach(([label],i)=>{const b=document.createElement('button');b.type='button';b.className='btn';b.textContent=label;b.onclick=()=>{
+      if(bondTab===i)return;
+      bondTab=i;renderBondTabs();
+      // Repaint only the visible chart group: repainting ALL bond panels on every
+      // subtab click reset price-edit focus, selections and scroll positions.
+      requestAnimationFrame(()=>{
+        try{
+          if(i===2){renderRates();usSpread();renderReal();}
+          else if(i===3)renderCredit();
+          else if(i===4)renderSovereign();
+        }catch(e){console.warn('Bond subtab chart refresh',e);}
+      });
+    };nav.append(b);});}
   const title=view.querySelector(':scope > .workspace-title');
   if(nav.parentElement!==view||nav.previousElementSibling!==title){title?title.after(nav):view.prepend(nav);}
   [...nav.children].forEach((b,i)=>b.classList.toggle('active',i===bondTab));
@@ -783,7 +795,7 @@ setTimeout(applyLayout,150);
       let n=0;
       for(const r of body.rows){
         const isGroup=/group|geo/.test(r.className);if(!isGroup)n++;
-        const keep=open||!over||n<=limit||(limit!==10&&r.matches('.etf-active,.selected,.active,[aria-selected=true]'));
+        const keep=open||!over||n<=limit||r.matches('.etf-active,.selected,.active,[aria-selected=true]');
         if(r.classList.contains('polish-cut')===keep)r.classList.toggle('polish-cut',!keep);
       }
       let btn=w.nextElementSibling?.classList.contains('polish-more')?w.nextElementSibling:null;
