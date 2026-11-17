@@ -99,7 +99,7 @@ function sectionLinks(){
 }
 
 function renderYieldSnapshot(){
- // Curve strip at the top of Yield curves only: level and day change by tenor, plus 2s10s.
+ // Yield-curve summary: yield levels, change since the prior available observation, and 10Y minus 2Y.
  const rates=$L('rates');if(!rates)return;
  $L('layout-yield-snapshot')?.remove();
  let host=$L('layout-curve-strip');if(host&&host.dataset.ready)return;
@@ -132,10 +132,15 @@ function renderYieldSnapshot(){
    if(Number.isFinite(sp)){const c=document.createElement('div');const d=sl-sp;c.className='layout-curve-chg '+(d>0?'up':d<0?'down':'');c.textContent=bp(d);td.append(c);}}
   else td.textContent='—';
   tr.append(td);
-  const date=document.createElement('td');date.textContent=last?.date||'—';date.title='Source observation date, not website refresh time. Website snapshot: '+(D.generatedAt||'unknown');tr.append(date);
+  const date=document.createElement('td');const observed=last?.date||'';
+  date.textContent=/^\d{4}-\d{2}-\d{2}$/.test(observed)?observed.slice(8,10)+'/'+observed.slice(5,7)+'/'+observed.slice(2,4):(observed||'—');
+  date.title='Actual source observation date: '+(observed||'unavailable')+'. Website refresh: '+(D.generatedAt||'unknown')+'.';tr.append(date);
   body.append(tr);
  }
  table.append(body);host.append(table);
+ const note=document.createElement('p');note.className='note layout-curve-explainer';
+ note.textContent='Large figures: yield levels (%). Small figures: changes in basis points since the previous available source observation, not necessarily the previous calendar day. 10Y − 2Y measures curve steepness; positive means the 10-year yield is higher. UK spot, US Treasury and ECB curves use different methods. Dates are observations, not website update times; — means not available.';
+ host.append(note);
 }
 
 function renderWatchFreshness(){
