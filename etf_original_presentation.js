@@ -21,10 +21,18 @@ function etfUnderlyingIdentity(f){
  .replace(/\b(accumulating|accumulation|distributing|distribution|acc|dist|inc|income|1c|1d)\b/g,'')
  .replace(/[^a-z0-9]/g,'');
 }
+function etfShareClassRank(f){
+ const name=String(f?.name||'');
+ if(/\b(?:acc|accumulating|accumulation|1c)\b/i.test(name))return 0;
+ if(/\b(?:dist|distributing|distribution|inc|income|1d)\b/i.test(name))return 2;
+ return 1;
+}
 function etfOriginalPeers(f){
   if(!f?.benchmark)return [];
-  const seen=new Set([f.isin||f.symbol]);
-  return ETF_FUNDS.filter(p=>etfIsConventional(p)&&p.symbol!==f.symbol&&etfUnderlyingIdentity(p)!==etfUnderlyingIdentity(f)&&etfOriginalKey(p)===etfOriginalKey(f)).sort((a,b)=>(a.terPct??Infinity)-(b.terPct??Infinity)||a.symbol.localeCompare(b.symbol)).filter(p=>{const id=p.isin||p.symbol;if(seen.has(id))return false;seen.add(id);return true;}).slice(0,3);
+  const seen=new Set([etfUnderlyingIdentity(f)]);
+  return ETF_FUNDS.filter(p=>etfIsConventional(p)&&p.symbol!==f.symbol&&etfUnderlyingIdentity(p)!==etfUnderlyingIdentity(f)&&etfOriginalKey(p)===etfOriginalKey(f))
+   .sort((a,b)=>etfShareClassRank(a)-etfShareClassRank(b)||(a.terPct??Infinity)-(b.terPct??Infinity)||a.symbol.localeCompare(b.symbol))
+   .filter(p=>{const id=etfUnderlyingIdentity(p);if(seen.has(id))return false;seen.add(id);return true;}).slice(0,3);
 }
 // All fund detail returns use the same actual anniversary-date convention as
 // the main ETF table. Price and adjusted-price chart bases remain distinct.
@@ -120,6 +128,7 @@ function etfV5PickMain(){
   const keep=new Set();
   for(const funds of groups.values()){
     const ranked=funds.slice().sort((a,b)=>
+      etfShareClassRank(a)-etfShareClassRank(b)||
       (a.terPct??Infinity)-(b.terPct??Infinity)||
       (etfAumUSD(b)??0)-(etfAumUSD(a)??0)||
       a.name.localeCompare(b.name));
