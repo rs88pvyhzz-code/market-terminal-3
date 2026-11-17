@@ -32,8 +32,8 @@ function renderWatchChanges(w){
  const parent=document.getElementById('personal-watchlist-panel');if(!parent)return;
  let host=document.getElementById('watchlist-changes');
  if(!host){host=el('section','watchlist-changes');host.id='watchlist-changes';}
- const news=parent.querySelector('.watchlist-bottom');
- if(news)parent.insertBefore(host,news);
+ const newsSection=parent.querySelector('.watchlist-bottom');
+ if(newsSection)parent.insertBefore(host,newsSection);
  else parent.append(host); // summary before final company news
  host.replaceChildren(el('h3','','WHAT CHANGED? · '+w.name));
  const c=watchProfile(w.symbol),stored=(D.company_news||[]).find(x=>x.symbol===w.symbol);
