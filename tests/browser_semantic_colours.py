@@ -83,6 +83,13 @@ with sync_playwright() as playwright:
         assert any(t in text for t in ('↑ +','↓ −','No change vs prior')),text
         if text.startswith('↑ +'):assert 't3-positive' in change.get_attribute('class')
         if text.startswith('↓ −'):assert 't3-negative' in change.get_attribute('class')
+    policy=page.locator('#macro-tiles button').filter(has_text='Bank of England Bank Rate')
+    if policy.count():
+        text=policy.first.inner_text()
+        assert 'Previous rate' in text,text
+        if 'changed' in text:
+            assert 'bp' in text,('Policy changes must be shown in basis points',text)
+            assert 'No change vs prior' not in text,text
     assert not errors,errors
     browser.close()
 print('PASS Terminal 3 semantic colours: watchlist, company, analytics, yields, economics and Markets date-only')
