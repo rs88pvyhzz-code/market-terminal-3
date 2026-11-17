@@ -4228,7 +4228,7 @@ function renderUST(){
   $('ust-selected').textContent=b.name+' · '+b.cusip;
   $('ust-selected-date').textContent='FedInvest source date: '+b.asOf;
   const manual=ustState.manual.get(b.cusip),q=b.ask??b.endOfDay??b.price;
-  const input=$('ust-clean-input');input.value=manual!=null?String(manual):(q!=null?String(q):'');
+  const input=$('ust-clean-input');if(document.activeElement!==input)input.value=manual!=null?String(manual):(q!=null?String(q):'');
   $('ust-price-basis').textContent=manual!=null?'YOUR MANUAL INPUT':q!=null?'OFFICIAL DATED '+(b.ask!=null?'BUY / OFFER':'REFERENCE MARK'):'NO OFFICIAL PRICE';
   const p=input.value!==''?Number(input.value):null;
   const v=p!=null?ustModel(b,p,manual!=null?(D.generatedAt||'').slice(0,10):b.asOf):null;
