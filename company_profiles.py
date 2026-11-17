@@ -11,6 +11,7 @@ GitHub runners start with an empty disk. Prices are NOT stored here; the page
 uses the constituent quotes collected on every build. Missing values stay None.
 """
 from __future__ import annotations
+import seed_site
 import datetime as dt
 import json
 import os
@@ -33,8 +34,8 @@ def _restore_published(filename=CACHE_NAME):
     # Seed from Terminal 2, then overlay Terminal 3's newer or more complete records.
     # Both the host path and its spelling are significant on GitHub Pages.
     current = f'https://{owner}.github.io/{name}/{filename}'
-    sibling = f'https://{owner}.github.io/Market-terminal-2/{filename}'
-    urls = (sibling, current) if name.lower() == 'market-terminal-3' else (current,)
+    sibling = seed_site.url(filename)
+    urls = seed_site.ordered(sibling, current) if name.lower() == 'market-terminal-3' else (current,)
     best = {}
     for url in urls:
         try:
