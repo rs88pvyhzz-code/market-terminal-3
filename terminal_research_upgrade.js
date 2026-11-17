@@ -114,6 +114,14 @@ function setupQuality(){
   ['Issuer-confirmed events',D.companyEventCoverage?.issuerSourced??0],
   ['Download warnings',warnings.length]
  ]){const card=make('div','mt-quality-card');card.append(make('span','',label),make('strong','',String(val)));strip.append(card);}summary.append(strip);
+ const invalidRanges=(D.quotes||[]).filter(x=>Number.isFinite(x.low52)&&x.low52<=0&&Number.isFinite(x.high52)&&x.high52>0);
+ const missingCurrency=(D.quotes||[]).filter(x=>x.group==='Equities'&&!(x.currency||'').trim());
+ if(invalidRanges.length||missingCurrency.length){
+   const d=make('p','note','Suppressed invalid 52-week lows: '+(invalidRanges.map(x=>x.symbol).join(', ')||'none')+
+      '. Missing index currency metadata: '+(missingCurrency.map(x=>x.symbol).join(', ')||'none')+
+      '. These source errors are not replaced with guessed figures.');
+   summary.append(d);
+ }
  const errors=make('p','note',stale.length?'Stale: '+stale.slice(0,10).join(', ')+(stale.length>10?' …':''):'No stale quote tickers reported.');summary.append(errors);
  const warn=make('details','mt-quality-alerts');warn.append(make('summary','',`Read ${warnings.length} collection warnings`));const list=make('ul');warnings.slice(0,30).forEach(s=>list.append(make('li','',String(s))));warn.append(list);summary.append(warn);
  const tiles=document.getElementById('dq-tiles');tiles?.insertAdjacentElement('beforebegin',summary);
