@@ -78,13 +78,13 @@ function panelForRisk(){
    const gaps=[],ret=[];let max=window[0].p,dd=0;
    for(let i=1;i<window.length;i++){const gap=(new Date(window[i].date+'T12:00:00Z')-new Date(window[i-1].date+'T12:00:00Z'))/86400000;
      if(gap<=0)return null;gaps.push(gap);
-     const r=Math.log(window[i].p/window[i-1].p);if(Math.abs(r)>Math.log(1.55))return null;ret.push(r);
+     const r=window[i].p/window[i-1].p-1;if(Math.abs(r)>.55)return null;ret.push(r);
      max=Math.max(max,window[i].p);dd=Math.min(dd,window[i].p/max-1);
    }
    const abnormal=gaps.filter(x=>x>6).length;if(abnormal>Math.max(2,gaps.length*0.01))return null;
-   const mean=ret.reduce((a,b)=>a+b,0)/ret.length;
-   const variance=ret.reduce((a,b)=>a+(b-mean)**2,0)/(ret.length-1);
-   return {growth:100*((last.p/window[0].p)**(365.25/days)-1),vol:Math.sqrt(variance*252)*100,draw:dd*100,n:window.length};
+   const risk=annualizedRiskMetrics(ret,252);
+   return {growth:100*((last.p/window[0].p)**(365.25/days)-1),
+     vol:risk.volatility,draw:dd*100,n:window.length};
  }
  function paint(){const years={'1Y':1,'3Y':3,'5Y':5}[document.getElementById('mt-risk-period').value]||1,
   inGBP=document.getElementById('mt-risk-currency')?.value==='gbp';
