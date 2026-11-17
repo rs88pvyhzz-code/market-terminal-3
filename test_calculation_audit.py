@@ -21,7 +21,7 @@ class CalculationAuditTests(unittest.TestCase):
             "generatedAt": "2026-11-17 14:05 UTC",
             "quotes": [
                 {"symbol": "^FTSE", "name": "FTSE 100", "price": 101,
-                 "asOf": "2026-11-16 16:35 UTC"}
+                 "currency": "GBP", "asOf": "2026-11-16 16:35 UTC"}
             ],
             "history": [
                 {"symbol": "^FTSE", "date": "2026-11-13", "close": 100},
@@ -66,6 +66,9 @@ class CalculationAuditTests(unittest.TestCase):
         self.assertEqual(record["validationCounters"]["invalidPricePoints"], 1)
         sample = record["independentPriceRiskSamples"][0]
         self.assertEqual(sample["symbol"], "^FTSE")
+        self.assertEqual(sample["currency"], "GBP")
+        self.assertEqual(sample["firstCloseDate"], "2026-11-13")
+        self.assertEqual(sample["lastCloseDate"], "2026-11-16")
         self.assertAlmostEqual(sample["closeToClosePriceReturnPct"], 2.0)
         self.assertIsNone(sample["annualizedPriceVolatilityPct"])
         text = json.dumps(record)
