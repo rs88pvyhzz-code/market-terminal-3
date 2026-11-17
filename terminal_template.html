@@ -2644,7 +2644,7 @@ function watchlistNews(w,q){
   const title=String(x.title||'').trim(),url=String(x.url||'');
   if(!newsDateMatches(x)||!url.startsWith('https://')||!title)return false;
   if(/stock price,? news|quote (?:and|&) history|latest stock news and headlines|historical data|stock quote|share price (?:today|and news)/i.test(title))return false;
-  if(/finance\.yahoo\.com\/(?:quote|news)\/[^/?#]+\/?(?:\?.*)?$/i.test(url))return false;
+  if(/finance\.yahoo\.com\/quote\/[^/?#]+\/?(?:\?.*)?$/i.test(url)||/finance\.yahoo\.com\/quote\/[^/?#]+\/news\/?(?:\?.*)?$/i.test(url))return false;
   const key=url.split('?')[0].replace(/\/$/,'').toLowerCase();
   if(seen.has(key))return false;seen.add(key);return true;
  });
