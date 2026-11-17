@@ -889,7 +889,7 @@ h2{font:600 15px/1.35 var(--font);color:var(--amber);margin:0}h3{font:500 13px v
   <p class="note" id="ladder-note">Indicative only, not advice. Costs use DMO dated offer (dirty) prices; your broker's prices and dealing charges will differ. Coupon tax is deducted in the year each coupon is paid; the gain to par is CGT-exempt. Holdings above £5,000 nominal fall within the accrued income scheme, which shifts some tax between years but is not modelled. The personal savings allowance is ignored.</p>
   </section>
   <div class="row"><h3>INDIVIDUAL GILT PRICE HISTORY</h3><div class="pills" id="gilt-period"><button type="button" class="btn" data-gilt-range="1W">1W</button><button class="btn" data-gilt-range="1M">1M</button><button class="btn" data-gilt-range="1Y">1Y</button><button class="btn" data-gilt-range="3Y">3Y</button><button class="btn" data-gilt-range="5Y">5Y</button><button class="btn active" data-gilt-range="MAX">MAX</button></div></div>
-  <div class="chart" id="gilt-chart"></div><p class="note">Individual price history starts with this upgrade and grows as daily snapshots are saved. Existing benchmark yield history remains in the panels below; these are different series.</p>
+  <div class="chart" id="gilt-chart"></div><p class="note" id="gilt-history-source">Only verified, dated daily DMO price observations are charted. Missing trading days are not estimated. Individual price history starts with this upgrade and grows as daily snapshots are saved. Existing benchmark yield history remains in the panels below; these are different series.</p>
   <p class="note">Source: <a target="_blank" rel="noopener noreferrer" href="https://www.dmo.gov.uk/data/pdfdatareport?reportCode=D10B">UK Debt Management Office, D10B daily Gilt Purchase and Sale Service</a>. Crown copyright under the Open Government Licence. Prices are retained with their original report date; missing automatic updates never become invented current prices.</p>
 </section>
 <section id="us-treasuries" class="panel">
@@ -4152,16 +4152,24 @@ function renderGilts(){
     ['Redemption amount / £100 nominal',b.indexLinked?'RPI-linked':'£100.00',b.indexLinked?'Inflation-linked proceeds require separate modelling':'Received at maturity; included in hold-to-maturity return']];
   if(b.indexLinked)st.splice(4,0,['Index ratio',b.indexRatio!=null?fmt(b.indexRatio,5):'—',b.indexationLag?'Indexation lag '+b.indexationLag:'Index-linked']);
   for(const [k,x,note] of st)host.append(researchTile(k,x,note));
-  const raw=giltHist.filter(p=>p.ticker===b.ticker).sort((x,y)=>x.date.localeCompare(y.date));
-  const dates=raw.map(p=>({date:p.date,v:p.close}));
+  const raw=giltHist.filter(p=>p.ticker===b.ticker&&/^\d{4}-\d{2}-\d{2}$/.test(p.date)&&Number.isFinite(Number(p.close))&&Number(p.close)>0);
+  const dates=[...new Map(raw.map(p=>[p.date,{date:p.date,v:Number(p.close)}])).values()].sort((x,y)=>x.date.localeCompare(y.date));
   const last=dates.at(-1)?.date,cutoff=last?new Date(last+'T12:00:00Z'):null;
   if(cutoff){if(giltState.range==='1W')cutoff.setUTCDate(cutoff.getUTCDate()-7);if(giltState.range==='1M')cutoff.setUTCMonth(cutoff.getUTCMonth()-1);
     if(giltState.range==='3Y')cutoff.setUTCFullYear(cutoff.getUTCFullYear()-3);
     if(giltState.range==='5Y')cutoff.setUTCFullYear(cutoff.getUTCFullYear()-5);
     if(giltState.range==='1Y')cutoff.setUTCFullYear(cutoff.getUTCFullYear()-1);}
   const pts=dates.filter(p=>giltState.range==='MAX'||!cutoff||p.date>=cutoff.toISOString().slice(0,10));
-  if(pts.length>=2)chart('gilt-chart',[{name:(b.shortTicker||b.isin)+' DMO offer clean',color:AMBER,pts}],{format:x=>'£'+fmt(x,2),aria:b.name+' DMO dated offer clean prices'});
-  else empty('gilt-chart',dates.length===1?'One DMO observation saved; the chart grows when later dated DMO files are collected.':'No historical DMO price snapshots yet.');
+  const gaps=pts.slice(1).map((point,i)=>(Date.parse(point.date)-Date.parse(pts[i].date))/86400000);
+  const enough=pts.length>=5&&gaps.every(g=>g>0&&g<=5);
+  const from=pts[0]?.date||'—',to=pts.at(-1)?.date||'—';
+  const note=$('gilt-history-source');
+  if(note)note.textContent=pts.length+' verified DMO offer-clean observations from '+from+' to '+to+
+    '. Historical prices are distinct from the currently selected valuation quotation ('+(b.asOf||'date unavailable')+').'+
+    (enough?' No prices are interpolated.':' Too few or too widely spaced observations for a meaningful daily chart. No interim prices are inferred.');
+  if(enough)chart('gilt-chart',[{name:b.name+' · DMO offer (clean)',color:AMBER,pts}],{
+    format:x=>'£'+fmt(x,2),aria:b.name+' DMO dated offer clean prices; '+pts.length+' sourced observations'});
+  else empty('gilt-chart','Insufficient verified daily price history ('+pts.length+' observations). Chart withheld rather than drawing a misleading straight line.');
   document.querySelectorAll('[data-gilt-range]').forEach(btn=>btn.classList.toggle('active',btn.dataset.giltRange===giltState.range));
   renderGiltLadder();
 }
