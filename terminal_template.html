@@ -2348,14 +2348,32 @@ function watchAligned(w,q,range='1Y',adjusted=false){
  if(rows.length<2)return {rows,bench,reason:'Fewer than two common trading dates with matching FX rates.'};
  return {rows,bench,converted:!sameCurrency};
 }
+// One definition of simple periodic returns, annualised sample volatility and
+// ex-post Sharpe for price and adjusted-price risk throughout the terminal.
+function annualizedRiskMetrics(xs,periodsPerYear=252,riskFreeAnnual=null){
+ if(!Array.isArray(xs)||!Number.isFinite(periodsPerYear)||periodsPerYear<=0||
+    xs.some(x=>!Number.isFinite(x)||x<=-1)||
+    (riskFreeAnnual!=null&&(!Number.isFinite(riskFreeAnnual)||riskFreeAnnual<=-1)))
+   return {volatility:null,sharpe:null,annualizedArithmetic:null};
+ if(xs.length<2)return {volatility:null,sharpe:null,annualizedArithmetic:null};
+ const mean=xs.reduce((a,b)=>a+b,0)/xs.length;
+ const sd=Math.sqrt(xs.reduce((a,b)=>a+(b-mean)**2,0)/(xs.length-1));
+ const volatility=sd*Math.sqrt(periodsPerYear)*100;
+ // A missing verified rate must NEVER become an assumed zero risk-free rate.
+ const rf=riskFreeAnnual==null?null:Math.pow(1+riskFreeAnnual,1/periodsPerYear)-1;
+ const sharpe=rf!=null&&sd>0?Math.sqrt(periodsPerYear)*(mean-rf)/sd:null;
+ return {volatility,sharpe,annualizedArithmetic:mean*periodsPerYear*100};
+}
 function watchReturns(rows,key){const out=[];for(let i=1;i<rows.length;i++){
  const gap=watchSpanDays(rows[i-1].date,rows[i].date);
  if(gap<1||gap>5)continue;
- const r=Math.log(rows[i][key]/rows[i-1][key]);if(Number.isFinite(r))out.push(r);
+ const prev=rows[i-1][key],now=rows[i][key];
+ if(!(prev>0&&now>0))continue;
+ const r=now/prev-1;if(Number.isFinite(r)&&r>-1)out.push(r);
  }return out;
 }
-function watchSampleVol(xs){if(xs.length<2)return null;let mean=xs.reduce((a,b)=>a+b,0)/xs.length;
- return Math.sqrt(252*xs.reduce((z,x)=>z+(x-mean)**2,0)/(xs.length-1))*100;
+function watchSampleVol(xs,periods=252){
+ return annualizedRiskMetrics(xs,periods).volatility;
 }
 // All period-based risk metrics use the same daily-price method in
 // Company Research and My Watchlist. Sparse weekly/monthly archives are
@@ -2367,7 +2385,7 @@ const RISK_PERIODS={
  '10Y':{label:'10 years',minDays:3260,minReturns:1500},
  'MAX':{label:'all available history',minDays:180,minReturns:120}
 };
-function riskWindowStats(prices,paired,range='1Y'){
+function riskWindowStats(prices,paired,range='1Y',annualization=252){
  const target=RISK_PERIODS[range]||RISK_PERIODS['1Y'];
  const sorted=(prices||[]).filter(x=>Number.isFinite(x.v)&&x.v>0&&x.date).slice().sort((a,b)=>a.date.localeCompare(b.date));
  const end=sorted.at(-1)?.date||'';
@@ -2376,7 +2394,7 @@ function riskWindowStats(prices,paired,range='1Y'){
  const span=rows.length>1?watchSpanDays(rows[0].date,rows.at(-1).date):0;
  const daily=watchReturns(rows.map(r=>({date:r.date,a:r.v})),'a');
  const enough=span>=target.minDays&&daily.length>=target.minReturns;
- const vol=enough?watchSampleVol(daily):null;
+ const vol=enough?watchSampleVol(daily,annualization):null;
  let top=0,drawdown=0;for(const x of rows){top=Math.max(top,x.v);drawdown=Math.min(drawdown,100*(x.v/top-1));}
  const periodMove=enough&&rows.length>1?100*(rows.at(-1).v/rows[0].v-1):null;
  const common=(paired||[]).filter(x=>x.date>=cutoff&&x.date<=end);
@@ -2384,7 +2402,7 @@ function riskWindowStats(prices,paired,range='1Y'){
  for(let i=1;i<common.length;i++){
    const days=watchSpanDays(common[i-1].date,common[i].date);
    if(days<1||days>5)continue;
-   const a=Math.log(common[i].a/common[i-1].a),b=Math.log(common[i].b/common[i-1].b);
+   const a=common[i].a/common[i-1].a-1,b=common[i].b/common[i-1].b-1;
    if(Number.isFinite(a)&&Number.isFinite(b)){xa.push(a);xb.push(b);}
  }
  const commonSpan=common.length>1?watchSpanDays(common[0].date,common.at(-1).date):0;
@@ -2411,7 +2429,7 @@ function watchTechnical(w,range='1Y'){
    rsi=loss===0?(gain===0?50:100):100-100/(1+gain/loss);}
  }
  const pair=watchAligned(w,watchQuoteMap.get(w.symbol),range,false);
- const stats=riskWindowStats(rows,pair.rows,range);
+ const stats=riskWindowStats(rows,pair.rows,range,w.assetType==='crypto'?365:252);
  return {...stats,bars:stats.rows,sma20:avg(20),sma50:avg(50),sma200:avg(200),rsi,
    obs:stats.matchedReturns,bench:pair.bench,benchError:pair.reason||null,
    currencyBasis:pair.converted?'GBP converted':watchCurrency(watchQuoteMap.get(w.symbol)?.currency),
@@ -2512,7 +2530,7 @@ function renderWatchlistRisk(w,q){
  const rsi=r.rsi==null?'Insufficient trading sessions':r.rsi>=70?'Above 70 · strong momentum':r.rsi<=30?'Below 30 · weak momentum':'Neutral momentum band';
  const entries=[
   [period+' PRICE MOVE',r.periodMove==null?'—':pc(r.periodMove),'Price only; excludes dividends'],
-  [period+' ANNUALISED VOLATILITY',r.volatility==null?'—':val(r.volatility)+'%','Daily log price returns, annualised'],
+  [period+' ANNUALISED VOLATILITY',r.volatility==null?'—':val(r.volatility)+'%','Sample standard deviation of simple daily price returns; 252 sessions (365 for daily crypto)'],
   [period+' BETA TO REFERENCE',val(r.beta,2),'Matched daily price returns · '+(r.currencyBasis||'common currency')],
   [period+' CORRELATION',val(r.corr,2),'Pearson daily return correlation'],
   [period+' MAX DRAWDOWN',r.drawdown==null?'—':val(r.drawdown)+'%',r.drawdownLabel||'Based on observed prices'],
@@ -2559,9 +2577,8 @@ function watchPriceRisk(symbol){
  const cutoff=new Date(Date.parse(last.date+'T12:00:00Z')-365*86400000).toISOString().slice(0,10);
  const recent=rows.filter(x=>x.date>=cutoff),logs=[];let high=-Infinity,drawdown=0;
  for(let i=0;i<recent.length;i++){const x=recent[i];high=Math.max(high,x.price);drawdown=Math.min(drawdown,100*(x.price/high-1));
-  if(i>0){const days=(Date.parse(x.date)-Date.parse(recent[i-1].date))/86400000;if(days<=7)logs.push(Math.log(x.price/recent[i-1].price));}}
- let volatility=null;if(logs.length>=125){const mean=logs.reduce((a,b)=>a+b,0)/logs.length;
-  volatility=100*Math.sqrt(252*logs.reduce((v,x)=>v+(x-mean)*(x-mean),0)/(logs.length-1));}
+  if(i>0){const days=(Date.parse(x.date)-Date.parse(recent[i-1].date))/86400000;if(days>=1&&days<=5)logs.push(x.price/recent[i-1].price-1);}}
+ let volatility=null;if(logs.length>=125)volatility=watchSampleVol(logs);
  return {threeYear,volatility,maxDrawdown:recent.length>=125?drawdown:null};
 }
 function shortSecurityName(name){return String(name||'').replace(/\bUCITS\b/gi,'').replace(/\bETF\b/gi,'').replace(/\bplc\b/gi,'').replace(/Accumulating/gi,'Acc').replace(/Distributing/gi,'Dist').replace(/\s+/g,' ').trim();}
