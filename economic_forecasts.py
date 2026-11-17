@@ -62,6 +62,17 @@ def collect(macros, csv_file):
         hh.sort(key=lambda p:p['date'])
         if not hh:continue
         latest=hh[-1]; earlier=hh[-2] if len(hh)>1 else None
+        # Policy rates often have unchanged DAILY observations. Previous means
+        # the last distinct policy level, not yesterday's equal rate.
+        policy_change_date=None
+        if m.get('frequency')=='policy':
+            for idx in range(len(hh)-1,0,-1):
+                if abs(hh[idx]['value']-hh[idx-1]['value'])>1e-9:
+                    earlier=hh[idx-1]
+                    policy_change_date=hh[idx]['date']
+                    break
+            else:
+                earlier=None
         period=str(m.get('period') or latest.get('period') or latest['date'])
         entry={'key':m.get('key'),'region':m.get('region','US'),
           'name':m.get('name'),'period':period,'observationDate':latest['date'],
@@ -69,6 +80,9 @@ def collect(macros, csv_file):
           'previousPeriod':(earlier.get('period') or earlier['date']) if earlier else None,
           'unit':m.get('unit',''),'frequency':m.get('frequency',''),
           'actualSource':m.get('source','')}
+        if m.get('frequency')=='policy':
+            entry['policyChangeDate']=policy_change_date
+            entry['policyChangeBp']=round((latest['value']-earlier['value'])*100,2) if earlier and policy_change_date else None
         f=forecasts.get((entry['key'],period))
         if f:
             if f['unit']==entry['unit']:
