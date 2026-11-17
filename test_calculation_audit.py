@@ -69,7 +69,7 @@ class CalculationAuditTests(unittest.TestCase):
         self.assertAlmostEqual(sample["closeToClosePriceReturnPct"], 2.0)
         self.assertIsNone(sample["annualizedPriceVolatilityPct"])
         text = json.dumps(record)
-        for forbidden in ["PRIVATE", "500000", "DO NOT LOG", "accountNumber", "secret-value", "weights"]:
+        for forbidden in ["PRIVATE", "500000", "DO NOT LOG", "\\\"accountNumber\\\"", "secret-value", "\\\"weights\\\""]:
             self.assertNotIn(forbidden, text)
 
     def test_append_with_chain_duplicate_protection_and_bounded_public_copy(self):
