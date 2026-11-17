@@ -114,6 +114,18 @@ function setupQuality(){
   ['Issuer-confirmed events',D.companyEventCoverage?.issuerSourced??0],
   ['Download warnings',warnings.length]
  ]){const card=make('div','mt-quality-card');card.append(make('span','',label),make('strong','',String(val)));strip.append(card);}summary.append(strip);
+ const validation=q.returnValidation;
+ if(validation){
+   const warning=make('p','note',
+     'Historical return check: '+validation.validPoints+' / '+validation.inputPoints+
+     ' valid observations; '+validation.invalidPricePoints+' invalid prices, '+
+     validation.invalidAdjustedPoints+' invalid dividend-adjusted prices, '+
+     validation.conflictingDates+' conflicting dates quarantined. '+
+     (validation.suspiciousMoveSymbols.length
+       ?'Suspicious windows (not overwritten): '+validation.suspiciousMoveSymbols.slice(0,8).join(', ')+'. '
+       :'')+'No dividend or FX observations were fabricated.');
+   summary.append(warning);
+ }
  const invalidRanges=(D.quotes||[]).filter(x=>Number.isFinite(x.low52)&&x.low52<=0&&Number.isFinite(x.high52)&&x.high52>0);
  const missingCurrency=(D.quotes||[]).filter(x=>x.group==='Equities'&&!(x.currency||'').trim());
  if(invalidRanges.length||missingCurrency.length){
