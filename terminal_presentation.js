@@ -41,7 +41,7 @@ const TABS={
 // `source` is the tab where the subject (company, gilt, ETF, watched security) is chosen.
 const ANALYTICS=[
   {key:'markets',title:'Markets',source:null,context:null,scopes:[['scope-view-fx'],[]],
-   items:['mt-risk-comparison','score-panel','analytics-rolling','market-valuations','compare',
+   items:['mt-risk-comparison','analytics-rolling','market-valuations','compare',
           'analytics-breadth','analytics-sectors','r23-market-conditions','r23-alerts','watchlist-freshness']}
   // Bonds, ETF and watchlist analysis now stay on their own tabs, beside the instrument.
 ];
@@ -60,7 +60,7 @@ const RESEARCH={
 const QUALITY=['r29-coverage','company-coverage'];
 
 // Duplicates and distractions. Kept in the DOM (hidden) so legacy renderers are safe.
-const RETIRED_IDS=['r24-watch','r23-moves','r23-watch','headline','subview-fx-news'];
+const RETIRED_IDS=['r24-watch','r23-moves','r23-watch','headline','subview-fx-news','score-panel'];
 const RETIRED_SELECTORS=[
   '.terminal-subnav','.r25-section-links','#mt-bond-nav','.r210-research-jump',
   '.t11-quality-shortcut','.mt-quality-link'
@@ -165,7 +165,8 @@ function orderDetailContent(){
  if(risk&&history&&history.previousElementSibling!==risk)history.before(risk);
  for(const node of [$L('watchlist-relative-meta')?.closest('.row'),$L('watchlist-relative-chart'),document.querySelector('.watchlist-relative-legend')])if(node)node.hidden=true;
  const watch=$L('personal-watchlist-panel'),news=watch?.querySelector('.watchlist-bottom'),selected=watch?.querySelector('.watchlist-selected-header');
- if(news&&selected&&selected.nextElementSibling!==news)selected.after(news);
+ // The full watchlist assessment comes first; earnings/events and news are read last.
+ if(news&&watch&&watch.lastElementChild!==news)watch.append(news);
  // Selected bond cash returns precede the history chart, retaining all controls.
  const stats=$L('gilt-stats'),chart=$L('gilt-chart');
  if(stats&&chart&&stats.parentElement===chart.parentElement&&stats.compareDocumentPosition(chart)&Node.DOCUMENT_POSITION_PRECEDING)chart.before(stats);
