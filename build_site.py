@@ -177,7 +177,7 @@ def record_verified_calculation_audit(html_path):
     """
     import calculation_audit
     html = Path(html_path).read_text("utf-8")
-    marker = re.search(r"window\\.MT_DATA\\s*=\\s*", html)
+    marker = re.search(r"window\.MT_DATA\s*=\s*", html)
     if marker is None:
         raise SystemExit("Verified build has no snapshot payload to audit")
     try:
