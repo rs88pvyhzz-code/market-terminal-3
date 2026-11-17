@@ -8,6 +8,7 @@ The Purchase (DMO buys / investor sells) and Sale (DMO sells / investor buys)
 columns are DMO retail-service reference prices, NOT executable broker quotes.
 For index-linked gilts, DMO 'clean' is REAL, while dirty includes indexation.
 """
+import seed_site
 import datetime as dt
 from fractions import Fraction
 import io
@@ -249,8 +250,8 @@ def collect(core,opts):
     if not opts.offline:
         # Gilt history is a dated series. Merge the verified Terminal 2 archive
         # with Terminal 3 rather than discarding hundreds of earlier observations.
-        sibling=f'https://{_REPO[0]}.github.io/Market-terminal-2/gilt_history_cache.json'
-        sources=(sibling,PUBLIC_HISTORY) if _REPO[1].lower()=='market-terminal-3' else (PUBLIC_HISTORY,)
+        sibling=seed_site.url('gilt_history_cache.json')
+        sources=seed_site.ordered(sibling,PUBLIC_HISTORY) if _REPO[1].lower()=='market-terminal-3' else (PUBLIC_HISTORY,)
         for url in sources:
             try:
                 obj=_get_json(url)

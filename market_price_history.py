@@ -9,6 +9,7 @@ therefore repeated scheduled builds can gradually cover an index universe.
 No prices are fabricated or extrapolated when a provider has no data.
 """
 from __future__ import annotations
+import seed_site
 import concurrent.futures
 import copy
 import datetime as dt
@@ -94,8 +95,8 @@ def prior_cache(url=None, opener=None):
             return {}
         owner, project = repo.split('/', 1)
         current = f'https://{owner}.github.io/{project}/{CACHE_NAME}'
-        sibling = f'https://{owner}.github.io/Market-terminal-2/{CACHE_NAME}'
-        urls = (sibling,current) if project.lower() == 'market-terminal-3' else (current,)
+        sibling = seed_site.url(CACHE_NAME)
+        urls = seed_site.ordered(sibling,current) if project.lower() == 'market-terminal-3' else (current,)
     saved = {}
     for source in urls:
         try:

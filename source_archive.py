@@ -3,6 +3,7 @@
 The checked-in recovery archive contains real responses collected 9 November.
 Newer runner/Pages cache entries always win. No market values are embedded in code.
 """
+import seed_site
 import gzip
 import hashlib
 import json
@@ -58,9 +59,9 @@ def restore(root=ROOT,published=True):
     repo=os.environ.get('GITHUB_REPOSITORY','')
     if published and '/' in repo:
         owner,name=repo.split('/',1)
-        sibling=f'https://{owner}.github.io/Market-terminal-2/{NAME}'
+        sibling=seed_site.url(NAME)
         current=f'https://{owner}.github.io/{name}/{NAME}'
-        urls=(sibling,current) if name.lower()=='market-terminal-3' else (current,)
+        urls=seed_site.ordered(sibling,current) if name.lower()=='market-terminal-3' else (current,)
         # The full primary-document archive is larger than the former 12 MB cap.
         # Its decompressed size, document paths and hashes remain verified by restore_bytes.
         compressed_limit=80_000_000

@@ -5,6 +5,7 @@ financial summaries is fetched per build; cache must be persisted between builds
 (the previously published GitHub Pages snapshot). Missing fields are never guessed.
 """
 from __future__ import annotations
+import seed_site
 import concurrent.futures
 import datetime as dt
 import json
@@ -96,8 +97,8 @@ def previous_site_snapshot():
     best=None
     # Seed Terminal 3 from Terminal 2 first, then combine with the newer Terminal 3 cache.
     # GitHub Pages URLs are case-sensitive (Market-terminal-2, not market-terminal-2).
-    sibling=f'https://{owner}.github.io/Market-terminal-2/fundamentals_cache.json'
-    urls=(sibling,base+'fundamentals_cache.json') if name.lower()=='market-terminal-3' else (base+'fundamentals_cache.json',)
+    sibling=seed_site.url('fundamentals_cache.json')
+    urls=seed_site.ordered(sibling,base+'fundamentals_cache.json') if name.lower()=='market-terminal-3' else (base+'fundamentals_cache.json',)
     for url in urls:
         try:
             request=urllib.request.Request(url,headers={

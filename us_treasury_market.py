@@ -6,6 +6,7 @@ Quoted prices are *not* live/executable broker bids/asks. No synthetic prices.
 """
 from html.parser import HTMLParser
 from pathlib import Path
+import seed_site
 import datetime as dt
 import csv,io,json,time
 import http.cookiejar
@@ -206,13 +207,14 @@ def public_json(url):
 # The original site keeps its saved snapshot; a new repository falls back to it
 # until it has published its own.
 LEGACY_PAGES='https://rs88pvyhzz-code.github.io/market-terminal/'
-SIBLING_PAGES='https://rs88pvyhzz-code.github.io/Market-terminal-2/'
+SIBLING_PAGES=seed_site.base()
 
 def prior_file(path,url):
     if path.exists():
         try:return json.loads(path.read_text('utf-8'))
         except (OSError,ValueError):pass
-    for candidate in (url,url.replace(_PAGES,SIBLING_PAGES),url.replace(_PAGES,LEGACY_PAGES)):
+    swapped=(url.replace(_PAGES,SIBLING_PAGES) if SIBLING_PAGES else None)
+    for candidate in (c for c in (url,swapped,url.replace(_PAGES,LEGACY_PAGES)) if c):
         try:return public_json(candidate)
         except Exception:continue
     return None

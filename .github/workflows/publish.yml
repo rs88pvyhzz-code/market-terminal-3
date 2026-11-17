@@ -24,6 +24,8 @@ jobs:
     timeout-minutes: 50
     env:
       SEC_USER_AGENT: ${{ secrets.SEC_USER_AGENT }}
+      # Older site used to seed empty caches. Set to 'none' once this site holds its own history.
+      MT_SEED_PAGES: https://rs88pvyhzz-code.github.io/Market-terminal-2/
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
