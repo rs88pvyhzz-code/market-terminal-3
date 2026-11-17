@@ -82,9 +82,13 @@ function panelForRisk(){
      max=Math.max(max,window[i].p);dd=Math.min(dd,window[i].p/max-1);
    }
    const abnormal=gaps.filter(x=>x>6).length;if(abnormal>Math.max(2,gaps.length*0.01))return null;
-   const risk=annualizedRiskMetrics(ret,252);
+   // Standalone presentation module: use the same simple-return SAMPLE
+   // volatility formula as the main terminal (separate script scope).
+   const mean=ret.reduce((a,b)=>a+b,0)/ret.length;
+   const variance=ret.reduce((a,b)=>a+(b-mean)**2,0)/(ret.length-1);
+   const volatility=Math.sqrt(252*variance)*100;
    return {growth:100*((last.p/window[0].p)**(365.25/days)-1),
-     vol:risk.volatility,draw:dd*100,n:window.length};
+     vol:volatility,draw:dd*100,n:window.length};
  }
  function paint(){const years={'1Y':1,'3Y':3,'5Y':5}[document.getElementById('mt-risk-period').value]||1,
   inGBP=document.getElementById('mt-risk-currency')?.value==='gbp';
