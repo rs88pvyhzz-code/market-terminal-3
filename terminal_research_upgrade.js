@@ -37,11 +37,34 @@ function setupMacro(){
 function panelForRisk(){
  const view=document.getElementById('subview-fx-analytics')||document.getElementById('view-analytics');if(!view)return;
  const panel=make('section','panel mt-risk-panel');panel.id='mt-risk-comparison';
- panel.innerHTML='<div class="row"><div><h2>COMPARABLE MARKET RISK & RETURNS</h2><p class="note">Price-only index performance; excludes dividends. Returns are annualised, volatility uses daily log returns. No figures are filled when price history is too short.</p></div><label class="mini" for="mt-risk-period">PERIOD <select class="field" id="mt-risk-period"><option>1Y</option><option>3Y</option><option>5Y</option></select></label></div><div class="small-scroll"><table class="watch mt-risk-table"><thead><tr><th>Market</th><th class="n">Ann. price return</th><th class="n">Volatility</th><th class="n">Max drawdown</th><th class="n">Observations</th></tr></thead><tbody id="mt-risk-rows"></tbody></table></div><p class="note" id="mt-risk-note">Indexes are in native currencies; not FX-converted, not total returns. Historical index-membership breadth elsewhere is subject to survivorship bias.</p>';
+ panel.innerHTML='<div class="row"><div><h2>COMPARABLE MARKET RISK & RETURNS</h2><p class="note">Price-only index performance; excludes dividends. Returns are annualised, volatility uses daily log returns. No figures are filled when price history is too short.</p></div><label class="mini" for="mt-risk-period">PERIOD <select class="field" id="mt-risk-period"><option>1Y</option><option>3Y</option><option>5Y</option></select></label><label class="mini" for="mt-risk-currency">BASIS <select class="field" id="mt-risk-currency"><option value="local">Local currency</option><option value="gbp">GBP converted</option></select></label></div><div class="small-scroll"><table class="watch mt-risk-table"><thead><tr><th>Market</th><th class="n">Ann. price return</th><th class="n">Volatility</th><th class="n">Max drawdown</th><th class="n">Observations</th></tr></thead><tbody id="mt-risk-rows"></tbody></table></div><p class="note" id="mt-risk-note">Indexes are in native currencies; not FX-converted, not total returns. Historical index-membership breadth elsewhere is subject to survivorship bias.</p>';
  const first=view.querySelector('#analytics-rolling')||view.querySelector('#analytics-breadth');first?first.before(panel):view.append(panel);
  const selected=new Set(['^FTSE','^FTMC','^GSPC','^IXIC','^STOXX50E','^GDAXI','^N225','^NSEI']);
  const quotes=new Map((D.quotes||[]).filter(q=>selected.has(q.symbol)).map(q=>[q.symbol,q]));
  const prices=new Map([...selected].map(sym=>[sym,[]]));
+ const fx=new Map(),needed=new Set(['GBPUSD=X','GBPEUR=X','USDJPY=X','USDINR=X']);
+ for(const row of D.history||[]){
+   if(!needed.has(row.symbol)||!(Number(row.close)>0)||!/^\d{4}-\d{2}-\d{2}$/.test(row.date||''))continue;
+   if(!fx.has(row.symbol))fx.set(row.symbol,[]);
+   fx.get(row.symbol).push({date:row.date,p:Number(row.close)});
+ }
+ for(const list of fx.values())list.sort((a,b)=>a.date.localeCompare(b.date));
+ const fxOn=(symbol,date)=>{
+   const rows=fx.get(symbol)||[],row=[...rows].reverse().find(x=>x.date<=date);
+   if(!row)return null;
+   const age=(Date.parse(date+'T12:00:00Z')-Date.parse(row.date+'T12:00:00Z'))/86400000;
+   return age>=0&&age<=5?row.p:null;
+ };
+ const fallbackCurrency={'^FTSE':'GBP','^FTMC':'GBP','^GSPC':'USD','^IXIC':'USD','^STOXX50E':'EUR','^GDAXI':'EUR','^N225':'JPY','^NSEI':'INR'};
+ function sterling(price,ccy,date){
+   if(ccy==='GBP')return price;
+   const dollar=fxOn('GBPUSD=X',date),euro=fxOn('GBPEUR=X',date);
+   if(ccy==='USD')return dollar?price/dollar:null;
+   if(ccy==='EUR')return euro?price/euro:null;
+   if(ccy==='JPY'){const rate=fxOn('USDJPY=X',date);return dollar&&rate?price/(dollar*rate):null;}
+   if(ccy==='INR'){const rate=fxOn('USDINR=X',date);return dollar&&rate?price/(dollar*rate):null;}
+   return null;
+ }
  for(const row of D.history||[]){const a=prices.get(row.symbol);if(!a)continue;const p=Number(row.close);if(Number.isFinite(p)&&p>0&&/^\d{4}-\d\d-\d\d$/.test(row.date||''))a.push({date:row.date,p});}
  for(const a of prices.values())a.sort((x,y)=>x.date.localeCompare(y.date));
  function metrics(arr,years){
@@ -63,15 +86,19 @@ function panelForRisk(){
    const variance=ret.reduce((a,b)=>a+(b-mean)**2,0)/(ret.length-1);
    return {growth:100*((last.p/window[0].p)**(365.25/days)-1),vol:Math.sqrt(variance*252)*100,draw:dd*100,n:window.length};
  }
- function paint(){const years={'1Y':1,'3Y':3,'5Y':5}[document.getElementById('mt-risk-period').value]||1;
+ function paint(){const years={'1Y':1,'3Y':3,'5Y':5}[document.getElementById('mt-risk-period').value]||1,
+  inGBP=document.getElementById('mt-risk-currency')?.value==='gbp';
   const tbody=document.getElementById('mt-risk-rows');tbody.replaceChildren();
   for(const symbol of ['^FTSE','^FTMC','^GSPC','^IXIC','^STOXX50E','^GDAXI','^N225','^NSEI']){
-    const r=metrics(prices.get(symbol)||[],years),row=make('tr');const cells=[quotes.get(symbol)?.name||symbol,r?dollars(r.growth):'—',r?dollars(r.vol):'—',r?dollars(r.draw):'—',r?String(r.n):'Insufficient'];
+    const source=prices.get(symbol)||[],ccy=quotes.get(symbol)?.currency||fallbackCurrency[symbol];
+    const converted=inGBP?source.map(p=>({date:p.date,p:sterling(p.p,ccy,p.date)})).filter(p=>Number.isFinite(p.p)&&p.p>0):source;
+    const r=metrics(converted,years),row=make('tr');const cells=[quotes.get(symbol)?.name||symbol,r?dollars(r.growth):'—',r?dollars(r.vol):'—',r?dollars(r.draw):'—',r?String(r.n):(inGBP?'Price/dated FX unavailable':'Insufficient')];
     cells.forEach((value,i)=>row.append(make('td',i?'n':'',value)));tbody.append(row);
   }
-  const note=document.getElementById('mt-risk-note');note.textContent='Native-currency price returns over '+years+' year'+(years>1?'s':'')+'. Indices exclude dividend income; comparisons across countries include different currencies. Current constituents used elsewhere can introduce survivorship bias.';
+  const note=document.getElementById('mt-risk-note');note.textContent=(inGBP?'Returns and risk in sterling using dated exchange rates. Missing FX means unavailable.':'Returns and risk in each market’s quoted currency.')+' '+years+' year'+(years>1?'s':'')+'. THESE ARE PRICE INDICES: dividends are excluded. No unsupported total-return estimates are substituted.';
  }
- document.getElementById('mt-risk-period').addEventListener('change',paint);paint();
+ document.getElementById('mt-risk-period').addEventListener('change',paint);
+ document.getElementById('mt-risk-currency').addEventListener('change',paint);paint();
 }
 function setupQuality(){
  const panel=document.getElementById('quality-panel');if(!panel)return;
@@ -87,6 +114,14 @@ function setupQuality(){
   ['Issuer-confirmed events',D.companyEventCoverage?.issuerSourced??0],
   ['Download warnings',warnings.length]
  ]){const card=make('div','mt-quality-card');card.append(make('span','',label),make('strong','',String(val)));strip.append(card);}summary.append(strip);
+ const invalidRanges=(D.quotes||[]).filter(x=>Number.isFinite(x.low52)&&x.low52<=0&&Number.isFinite(x.high52)&&x.high52>0);
+ const missingCurrency=(D.quotes||[]).filter(x=>x.group==='Equities'&&!(x.currency||'').trim());
+ if(invalidRanges.length||missingCurrency.length){
+   const d=make('p','note','Suppressed invalid 52-week lows: '+(invalidRanges.map(x=>x.symbol).join(', ')||'none')+
+      '. Missing index currency metadata: '+(missingCurrency.map(x=>x.symbol).join(', ')||'none')+
+      '. These source errors are not replaced with guessed figures.');
+   summary.append(d);
+ }
  const errors=make('p','note',stale.length?'Stale: '+stale.slice(0,10).join(', ')+(stale.length>10?' …':''):'No stale quote tickers reported.');summary.append(errors);
  const warn=make('details','mt-quality-alerts');warn.append(make('summary','',`Read ${warnings.length} collection warnings`));const list=make('ul');warnings.slice(0,30).forEach(s=>list.append(make('li','',String(s))));warn.append(list);summary.append(warn);
  const tiles=document.getElementById('dq-tiles');tiles?.insertAdjacentElement('beforebegin',summary);

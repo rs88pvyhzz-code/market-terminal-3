@@ -642,7 +642,7 @@ h2{font:600 15px/1.35 var(--font);color:var(--amber);margin:0}h3{font:500 13px v
     <th data-sort="price" class="n">Last</th><th data-sort="day" class="n">Day</th><th class="n">1W</th><th class="n">1M</th><th data-sort="year" class="n">1Y</th><th data-sort="three" class="n">3Y p.a.</th><th data-sort="five" class="n">5Y p.a.</th>
     <th class="n hide-sm">52w range · low to high</th><th class="hide-sm">As of (UTC)</th>
   </tr></thead><tbody id="watch-rows"></tbody></table></div>
-  <p class="note">¹ Yahoo US Treasury-yield tickers are indicative yield indices, not tradable bond total returns. Daily/YTD/1Y values for yields are changes in basis points. VIX is an index level; no YTD return is shown. Other columns show price moves in each instrument's quoted units, not dividend-adjusted investment returns.</p>
+  <p class="note">Equity and ETF returns use sourced dividend-adjusted closes where complete; otherwise price-only, as labelled on each cell. Price indices exclude dividends. ¹ Yahoo US Treasury-yield tickers are indicative yield indices, not tradable bond total returns. Daily/YTD/1Y values for yields are changes in basis points. VIX is an index level; no YTD return is shown. Other columns show price moves in each instrument's quoted units, not dividend-adjusted investment returns.</p>
 </section>
 <section class="panel" id="movers">
   <div class="movers-head">
@@ -1208,7 +1208,32 @@ const WATCH_MAJOR=['^GSPC','^IXIC','^DJI','^RUT','^GSPTSE','^BVSP','^MXX','^FTSE
   'BZ=F','CL=F','GC=F','SI=F','HG=F','NG=F','ZW=F','ZC=F','BTC-USD','ETH-USD'];
 function watchMajorRank(q){const i=WATCH_MAJOR.indexOf(q.symbol);return i<0?999:i;}
 function watchSection(q){return WATCH_SECTIONS.find(([,test])=>test(q))[0];}
-function watchLongReturn(q,key){return q.kind==='yield'||q.kind==='volatility'?null:mtMoveReturn(q,key==='three'?'3Y':'5Y');}
+// Prefer verifiable dividend-adjusted closes for equity/ETF returns. A market
+// PRICE index has no dividend total-return observations in this feed, and must
+// never be represented as a reinvested-dividend index.
+function marketPeriodObservation(q,range){
+ if(q.kind==='yield'||q.kind==='volatility')return {value:null,basis:'Yield/level, not investment return'};
+ const rows=histMap.get(q.symbol)||[];
+ const end=rows.at(-1);if(!end||!(end.v>0))return {value:null,basis:'No dated market price'};
+ const cutoff=startOf(end.date,range),target=Date.parse(cutoff+'T12:00:00Z');
+ const base=[...rows].reverse().find(p=>p.date<=cutoff&&p.v>0);
+ if(!base||!Number.isFinite(target))return {value:null,basis:'Insufficient historical prices'};
+ const lag=(target-Date.parse(base.date+'T12:00:00Z'))/86400000;
+ if(lag<0||lag>10)return {value:null,basis:'Missing price near anniversary date'};
+ const days=(Date.parse(end.date+'T12:00:00Z')-Date.parse(base.date+'T12:00:00Z'))/86400000;
+ const years={'1Y':1,'3Y':3,'5Y':5}[range]||0;
+ if(years&&days<340*years)return {value:null,basis:'Partial period: not annualised'};
+ if(!years&&days<1)return {value:null,basis:'Insufficient price observations'};
+ const matching=rows.filter(p=>p.date>=base.date&&p.date<=end.date),count=matching.filter(p=>Number.isFinite(p.adj)&&p.adj>0).length;
+ const adjusted=['equity','etf'].includes(q.kind)&&base.adj>0&&end.adj>0&&count>=Math.max(2,Math.ceil(matching.length*.9));
+ const first=adjusted?base.adj:base.v,last=adjusted?end.adj:end.v;
+ if(!(first>0&&last>0))return {value:null,basis:'Invalid return price'};
+ const gross=last/first;
+ const value=100*((years>1?Math.pow(gross,365.25/days):gross)-1);
+ const basis=adjusted?'Dividend-adjusted close proxy (not audited NAV)':'Price only: dividends excluded';
+ return {value:Number.isFinite(value)?value:null,basis,from:base.date,to:end.date};
+}
+function watchLongReturn(q,key){return marketPeriodObservation(q,key==='three'?'3Y':'5Y').value;}
 // Suppress broad ETF proxies only when a corresponding market index is present.
 // Keep their data for analytics, and retain distinct sector/global exposures.
 function marketEtfDuplicate(q){
@@ -1224,20 +1249,25 @@ function renderWatch(){const body=$('watch-rows');body.replaceChildren();let row
   const tr=el('tr',q.symbol===state.sym?'selected':'');
   td(tr,q.name);td(tr,quoteScale(q)>1?'GBP':q.currency||'—','hide-sm');td(tr,price(q),'n');
   td(tr,move(q,'day'),'n '+tone(moveVal(q,'day')));
-  for(const range of ['1W','1M']){const history=histMap.get(q.symbol)||[],end=history.at(-1),cut=end?startOf(end.date,range):'',base=history.filter(p=>p.date<=cut).at(-1);
+  for(const range of ['1W','1M']){
+    const history=histMap.get(q.symbol)||[],end=history.at(-1),cut=end?startOf(end.date,range):'',base=history.filter(p=>p.date<=cut).at(-1);
     const valid=base&&end&&(Date.parse(cut)-Date.parse(base.date))/86400000<=7;
-    const v=valid?(q.kind==='yield'?(end.v-base.v)*100:base.v>0?(end.v/base.v-1)*100:null):null;
-    td(tr,q.kind==='yield'?bp(v):pc(v),'n '+tone(v));}
-  td(tr,move(q,'year'),'n '+tone(moveVal(q,'year')));
-  for(const k of ['three','five']){const v=watchLongReturn(q,k);td(tr,v==null?'—':pc(v),'n '+tone(v));}
+    const y=q.kind==='yield'?valid?(end.v-base.v)*100:null:null;
+    const result=q.kind==='yield'?{value:y,basis:'Yield change in bp'}:marketPeriodObservation(q,range);
+    const v=result.value,c=td(tr,q.kind==='yield'?bp(v):pc(v),'n '+tone(v));
+    c.title=result.basis+(result.from?' · '+result.from+' to '+result.to:'');
+  }
+  const one=marketPeriodObservation(q,'1Y'),oneCell=td(tr,q.kind==='yield'?move(q,'year'):pc(one.value),'n '+tone(one.value));
+  oneCell.title=one.basis+(one.from?' · '+one.from+' to '+one.to:'');
+  for(const range of ['3Y','5Y']){const r=marketPeriodObservation(q,range),cell=td(tr,r.value==null?'—':pc(r.value),'n '+tone(r.value));cell.title=r.basis+(r.from?' · '+r.from+' to '+r.to:'');}
   const rangeCell=td(tr,'','n hide-sm');
-  if(Number.isFinite(q.low52)&&Number.isFinite(q.high52)&&q.high52>q.low52&&Number.isFinite(q.price)){
+  if(Number.isFinite(q.low52)&&q.low52>0&&Number.isFinite(q.high52)&&q.high52>q.low52&&Number.isFinite(q.price)&&q.price>0){
     const position=100*(q.price-q.low52)/(q.high52-q.low52);
     const track=el('div');track.style.cssText='position:relative;height:5px;background:#495260;margin:8px 5px';
     const marker=el('span');marker.style.cssText='position:absolute;top:-4px;width:3px;height:13px;background:#83d4ff;left:'+Math.max(0,Math.min(100,position))+'%';track.append(marker);
     rangeCell.append(el('div','',fmt(q.low52/quoteScale(q),prec(q))+' – '+fmt(q.high52/quoteScale(q),prec(q))),track);
     rangeCell.title=Math.round(position)+'% of the way from the 52-week low to high';track.setAttribute('role','img');track.setAttribute('aria-label',rangeCell.title);
-  }else rangeCell.textContent='—';const quoteDate=td(tr,q.asOf?String(q.asOf).slice(0,10):'—','hide-sm');quoteDate.title=q.asOf||'Source timestamp unavailable';
+  }else{rangeCell.textContent='—';rangeCell.title='Unavailable: invalid or incomplete sourced 52-week low/high.';}const quoteDate=td(tr,q.asOf?String(q.asOf).slice(0,10):'—','hide-sm');quoteDate.title=q.asOf||'Source timestamp unavailable';
   tr.onclick=()=>{state.sym=q.symbol;$('main-pick').value=q.symbol;renderMain();renderWatch();};body.append(tr);}
 }
 function healthcareComparison(asset,benchmark){
@@ -2608,19 +2638,34 @@ function watchlistNews(w,q){
  $('watchlist-news-time').textContent=saved?'Retrieved '+(saved.retrievedAt||'date unavailable'):'No stored company news';
  $('watchlist-news-context').textContent=(q?.changePct!=null?w.name+' '+pc(q.changePct)+' on '+(q.asOf||'unknown date')+'. ':'')+
   'Related articles are search matches, not evidence that a story caused the share-price move. Verify company announcements and corporate actions.';
- for(const article of articles.filter(x=>newsDateMatches(x)).slice(0,7)){
-  if(!String(article.url||'').startsWith('https://'))continue;
+ // Exclude generic quotation and headline-index pages; these are navigation,
+ // not company developments. Preserve sourced issuer and publisher articles.
+ const seen=new Set(),material=articles.filter(x=>{
+  const title=String(x.title||'').trim(),url=String(x.url||'');
+  if(!newsDateMatches(x)||!url.startsWith('https://')||!title)return false;
+  if(/stock price,? news|quote (?:and|&) history|latest stock news and headlines|historical data|stock quote|share price (?:today|and news)/i.test(title))return false;
+  if(/finance\.yahoo\.com\/quote\/[^/?#]+\/?(?:\?.*)?$/i.test(url)||/finance\.yahoo\.com\/quote\/[^/?#]+\/news\/?(?:\?.*)?$/i.test(url))return false;
+  const key=url.split('?')[0].replace(/\/$/,'').toLowerCase();
+  if(seen.has(key))return false;seen.add(key);return true;
+ });
+ for(const article of material.slice(0,5)){
   const item=el('article','company-story'),a=el('a','',article.title||'Open news source');a.href=article.url;a.target='_blank';a.rel='noopener noreferrer';
   item.append(a,el('span','',(article.source||'Publisher')+' · '+(article.published||'Date unavailable')));host.append(item);
  }
- if(!host.children.length)host.append(el('p','note',newsEmptyText()));
+ if(!host.children.length)host.append(el('p','note','No material company articles in the verified snapshot. Use SEARCH LATEST NEWS for a wider search.'));
  $('watchlist-news-live').href=companyNewsSearch(w.name);
  $('watchlist-quote-link').href=w.assetType==='fund'?'https://www.vanguardinvestor.co.uk/investments':'https://finance.yahoo.com/quote/'+encodeURIComponent(w.symbol)+'/';
 }
 function renderWatchlistEvents(w){
  const host=$('watchlist-events');host.replaceChildren();
- const dates=(D.company_events||[]).filter(e=>e.symbol===w.symbol).sort((a,b)=>String(a.date||'').localeCompare(String(b.date||''))).slice(0,6);
- if(!dates.length){host.append(el('p','note','No dated results or dividend events were retrieved for this security. Check the issuer investor-relations site.'));return;}
+ const dates=(D.company_events||[]).filter(e=>e.symbol===w.symbol&&/\d{4}-\d{2}-\d{2}/.test(String(e.date||'')))
+  .sort((a,b)=>String(a.date||'').localeCompare(String(b.date||''))).slice(0,6);
+ const eventsPanel=host.closest('.watchlist-events'),newsContext=$('watchlist-news-context');
+ let note=$('watchlist-events-inline-note');
+ if(!note&&newsContext){note=el('p','note','No confirmed upcoming results or dividend dates in this snapshot.');note.id='watchlist-events-inline-note';newsContext.after(note);}
+ if(eventsPanel)eventsPanel.hidden=!dates.length;
+ if(note)note.hidden=!!dates.length;
+ if(!dates.length)return;
  for(const event of dates){const box=el('div','watchlist-event');box.append(el('span','event-date',(event.date||'Date unavailable')+' · '+(event.type||'Event')),
   el('span','',event.title||'Company event'),el('span','mini',event.status||'Source not verified'));
   if(String(event.sourceUrl||'').startsWith('https://')){const a=el('a','','SOURCE');a.href=event.sourceUrl;a.target='_blank';a.rel='noopener noreferrer';box.append(a);}
@@ -4100,7 +4145,9 @@ function forensicClaude(){
 }
 
 function renderGilts(){
-  const table=$('gilt-rows');table.replaceChildren();
+  const table=$('gilt-rows'),viewport=table.closest('.gilt-table-scroll');
+  const previousScrollTop=viewport?.scrollTop||0,previousScrollLeft=viewport?.scrollLeft||0;
+  table.replaceChildren();
   const rows=giltList.filter(g=>(giltState.type==='all'||(giltState.type==='linked'&&g.indexLinked)||(giltState.type==='conventional'&&!g.indexLinked))&&
     (!giltState.search||[g.name,g.ticker,g.shortTicker,g.isin,g.maturity].join(' ').toLowerCase().includes(giltState.search)));
   const count=giltList.filter(g=>g.quoted).length,linked=giltList.filter(g=>g.indexLinked).length;
@@ -4125,13 +4172,15 @@ function renderGilts(){
     
     tr.onclick=()=>{giltState.symbol=g.ticker;renderGilts();};table.append(tr);
   }
+  if(viewport){viewport.scrollTop=previousScrollTop;viewport.scrollLeft=previousScrollLeft;}
   const b=giltList.find(g=>g.ticker===giltState.symbol);
   if(!b){mtRenderGiltTax(null,null,false);$('gilt-selected').textContent='NO GILT DATA AVAILABLE';$('gilt-stats').replaceChildren();empty('gilt-chart','No bonds returned.');return;}
   const review=giltYieldReviewReason(b),reviewHost=$('gilt-yield-review');reviewHost.hidden=!review;reviewHost.textContent=review?'DERIVED YIELDS REQUIRE REVIEW · '+review+' Excluded from automatic yield ranking and gilt-ladder optimisation. Official DMO prices and security data are retained.':'';
   $('gilt-selected').textContent=b.name+'  ·  '+(b.shortTicker||b.isin);
   $('gilt-selected-source').textContent=b.asOf?'DMO source date: '+b.asOf:'No verified DMO quotation';
   const input=$('gilt-clean-input'),user=giltState.manual.get(b.ticker);
-  input.value=user!=null?String(user):(b.askClean!=null?String(b.askClean):'');
+  // Do not overwrite an in-progress numeric edit (e.g. "95.") on each keypress.
+  if(document.activeElement!==input)input.value=user!=null?String(user):(b.askClean!=null?String(b.askClean):'');
   $('gilt-price-basis').textContent=user!=null?'USER PRICE (today)':b.quoted?'DMO HISTORICAL OFFER ('+b.asOf+')':'NO MARKET QUOTE';
   const price=input.value!==''?Number(input.value):null;
   const v=price!=null&&!b.indexLinked?giltValuation(b,price,user!=null?(D.generatedAt||'').slice(0,10):b.asOf,user==null?b.askDirty:null):null;
@@ -4209,7 +4258,7 @@ function renderUST(){
   $('ust-selected').textContent=b.name+' · '+b.cusip;
   $('ust-selected-date').textContent='FedInvest source date: '+b.asOf;
   const manual=ustState.manual.get(b.cusip),q=b.ask??b.endOfDay??b.price;
-  const input=$('ust-clean-input');input.value=manual!=null?String(manual):(q!=null?String(q):'');
+  const input=$('ust-clean-input');if(document.activeElement!==input)input.value=manual!=null?String(manual):(q!=null?String(q):'');
   $('ust-price-basis').textContent=manual!=null?'YOUR MANUAL INPUT':q!=null?'OFFICIAL DATED '+(b.ask!=null?'BUY / OFFER':'REFERENCE MARK'):'NO OFFICIAL PRICE';
   const p=input.value!==''?Number(input.value):null;
   const v=p!=null?ustModel(b,p,manual!=null?(D.generatedAt||'').slice(0,10):b.asOf):null;

@@ -44,43 +44,24 @@ with sync_playwright() as p:
         groups=page.locator('#watchlist-changes .watch-change-group > strong').all_text_contents()
         assert all(g in ['Results','Guidance','Dividends','Announcements'] for g in groups),groups
         assert groups or page.locator('#watchlist-changes p.mini').count()==1
-        assert page.locator('#personal-watchlist-panel > :last-child').get_attribute('id')=='watchlist-changes'
+        assert page.locator('#personal-watchlist-panel > :last-child').evaluate('(n)=>n.classList.contains("watchlist-bottom")'), 'Company news should be last'
         assert page.locator('#watchlist-changes').evaluate('(e)=>e.getBoundingClientRect().right<=innerWidth+1')
         page.screenshot(path=f'/tmp/compact-watchlist-changes-{width}.png')
         page.locator('#tab-overview').dispatch_event('click')
         assert page.locator('#view-overview > section').evaluate_all('(xs)=>xs.map(x=>x.id)')[:3]==['overview-board','r24-conditions','r24-developments']
         page.screenshot(path=f'/tmp/compact-overview-{width}.png')
         page.locator('#tab-analytics').dispatch_event('click')
-        assert page.locator('#layout-body-markets > *').evaluate_all('(xs)=>xs.slice(0,2).map(x=>x.id)')==['mt-risk-comparison','score-panel']
-        assert page.locator('#mt-movers-table').count()==1
-        assert page.locator('#mt-movers-table th button').count()==7
-        assert page.locator('#score .mt-mover-row').count()==0
-        assert page.locator('#score-panel .mt-reading-note').first.is_visible()
-        rows=page.locator('#mt-movers-matrix tr[data-symbol]')
-        assert rows.count()>0
-        # Independently compare the displayed 1M result with the stored closing prices.
-        symbol=rows.first.get_attribute('data-symbol')
-        points=sorted([x for x in data['history'] if x['symbol']==symbol and x.get('close',0)>0],key=lambda x:x['date'])
-        if len(points)>1:
-            target=(datetime.date.fromisoformat(points[-1]['date'])-datetime.timedelta(days=30)).isoformat()
-            prior=[x for x in points if x['date']<=target]
-            if prior:
-                expected=(points[-1]['close']/prior[-1]['close']-1)*100
-                actual=float(rows.first.locator('td').nth(1).inner_text().replace('%',''))
-                assert abs(expected-actual)<.051,(expected,actual)
-        page.locator('[data-mt-period="YTD"]').click()
-        assert page.locator('#mt-movers-view').input_value()=='ranked'
-        values=[float(x.replace('%','')) for x in page.locator('#mt-movers-matrix tr[data-symbol] td:nth-child(5)').all_text_contents() if x!='—']
-        assert values==sorted(values,reverse=True)
-        page.locator('[data-mt-period="YTD"]').click()
-        values=[float(x.replace('%','')) for x in page.locator('#mt-movers-matrix tr[data-symbol] td:nth-child(5)').all_text_contents() if x!='—']
-        assert values==sorted(values)
-        page.locator('#mt-movers-view').select_option('regions')
-        assert page.locator('#mt-movers-matrix tr.watch-section').first.text_content()=='UK equity indices'
-        row_height=rows.first.bounding_box()['height'];assert row_height<=36,(width,row_height)
-        assert page.locator('#mt-movers-table thead th').first.evaluate('(e)=>getComputedStyle(e).position')=='sticky'
-        page.locator('#score-panel').scroll_into_view_if_needed()
-        page.screenshot(path=f'/tmp/compact-performance-{width}.png')
+        assert page.locator('#layout-body-markets > *').first.get_attribute('id')=='mt-risk-comparison'
+        assert page.locator('#score-panel').is_hidden(),'Duplicate market performance table must be retired'
+        assert page.locator('#mt-risk-rows tr').count()==8
+        for period in ['1Y','3Y','5Y']:
+            page.locator('#mt-risk-period').select_option(period)
+            assert page.locator('#mt-risk-rows tr').count()==8
+        page.locator('#mt-risk-currency').select_option('gbp')
+        assert 'sterling' in page.locator('#mt-risk-note').inner_text().lower()
+        page.locator('#mt-risk-currency').select_option('local')
+        page.locator('#mt-risk-comparison').scroll_into_view_if_needed()
+        page.screenshot(path=f'/tmp/compact-risk-{width}.png')
         page.locator('#tab-companies').dispatch_event('click');page.locator('#company-pick').select_option('SHEL.L');page.locator('#research-tab-0').click()
         ids=page.locator('#research-view-0 > [id]').evaluate_all('(xs)=>xs.map(x=>x.id)')
         assert page.locator('#company-coverage-gaps').is_visible()
