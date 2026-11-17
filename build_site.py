@@ -37,6 +37,8 @@ LAYOUT_STYLE_ID = 'terminal-layout-styles'
 LAYOUT_SCRIPT_ID = 'terminal-layout-script'
 NEWS_JS = 'news_freshness.js'
 NEWS_SCRIPT_ID = 'news-freshness'
+FRESH_JS = 'data_freshness.js'
+FRESH_SCRIPT_ID = 'data-freshness'
 
 
 def run(label, args, required=True):
@@ -162,6 +164,11 @@ def inject_layout(html_path):
         raise SystemExit(f'{NEWS_JS} must not contain a closing script tag.')
     data_end += len('</script>')
     html = html[:data_end] + f'\n<script id="{NEWS_SCRIPT_ID}">\n{news_js}\n</script>' + html[data_end:]
+    fresh_js = (ROOT / FRESH_JS).read_text('utf-8')
+    if '</script' in fresh_js.lower():
+        raise SystemExit(f'{FRESH_JS} must not contain a closing script tag.')
+    data_end += len(f'\n<script id="{NEWS_SCRIPT_ID}">\n{news_js}\n</script>')
+    html = html[:data_end] + f'\n<script id="{FRESH_SCRIPT_ID}">\n{fresh_js}\n</script>' + html[data_end:]
     html = alias_all_styles(html)
     html = html.replace('</head>', f'<style id="{LAYOUT_STYLE_ID}">\n{css}\n</style>\n</head>')
     html = html.replace(MAIN_SCRIPT_END, f'\ninit();\n/*{LAYOUT_SCRIPT_ID}*/\n{js}\n}})();')

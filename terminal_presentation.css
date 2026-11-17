@@ -848,3 +848,10 @@ details.period-dates .time-box{margin-top:7px}
 #workspace-stage #mt-risk-comparison .mt-risk-table td:nth-child(4):not(:empty){
  color:#ff7483!important;
 }
+
+/* Data freshness strip (data_freshness.js) */
+#freshness-strip{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:2px 12px;margin-top:4px;font:11px/1.4 var(--font,ui-monospace,Menlo,monospace);color:var(--muted,#96969f)}
+#freshness-strip .fresh-ok{color:var(--muted,#96969f)}
+#freshness-strip .fresh-warn{color:var(--amber,#ffa028)}
+#freshness-strip .fresh-old{color:#ff6b6b;font-weight:600}
+#freshness-strip .fresh-warn::before,#freshness-strip .fresh-old::before{content:'\26A0\00a0'}
