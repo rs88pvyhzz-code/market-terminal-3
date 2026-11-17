@@ -787,3 +787,32 @@ details.period-dates .time-box{margin-top:7px}
  #workspace-stage #etf-tracker-panel .etf-table :is(th,td):nth-child(9){width:15%!important}
  #workspace-stage #etf-tracker-panel .etf-table :is(th,td):nth-child(10){width:9%!important}
 }
+
+/* November table review: all return headings and cells share one layout. */
+#workspace-stage #etf-tracker-panel .etf-table-scroll{overflow-x:auto!important}
+#workspace-stage #etf-tracker-panel .etf-table{min-width:1080px!important;table-layout:auto!important}
+#workspace-stage #etf-tracker-panel .etf-table :is(th,td):nth-child(n){display:table-cell!important;width:auto!important;white-space:nowrap}
+#workspace-stage #etf-tracker-panel .etf-table :is(th,td):first-child{min-width:260px;white-space:normal}
+#workspace-stage #etf-tracker-panel .etf-table :is(th,td):nth-child(11){text-align:center!important}
+.company-standalone-price{display:none!important}
+.credit-stat .metric-risk{color:#83d4ff!important}
+#watch-rows td{vertical-align:middle}
+#watch-rows td:nth-child(10){min-width:155px}
+
+@media(max-width:1100px){
+ #workspace-stage #etf-tracker-panel .etf-table{min-width:0!important;table-layout:fixed!important}
+ #workspace-stage #etf-tracker-panel .etf-table :is(th,td):nth-child(n){white-space:normal}
+ #workspace-stage #etf-tracker-panel .etf-table :is(th,td):first-child{min-width:0;width:31%!important}
+ #workspace-stage #etf-tracker-panel .etf-table :is(th,td):nth-child(4),
+ #workspace-stage #etf-tracker-panel .etf-table :is(th,td):nth-child(5){display:none!important}
+ #workspace-stage #etf-tracker-panel .etf-table :is(th,td):nth-child(3),
+ #workspace-stage #etf-tracker-panel .etf-table :is(th,td):nth-child(11){width:5%!important}
+}
+@media(max-width:600px){
+ #workspace-stage #etf-tracker-panel .etf-table :is(th,td):nth-child(2),
+ #workspace-stage #etf-tracker-panel .etf-table :is(th,td):nth-child(3),
+ #workspace-stage #etf-tracker-panel .etf-table :is(th,td):nth-child(7){display:none!important}
+ #workspace-stage #etf-tracker-panel .etf-table :is(th,td):first-child{width:35%!important}
+ #workspace-stage #etf-tracker-panel .etf-table :is(th,td):nth-child(n+6){font-size:12px!important;padding:7px 3px!important}
+ #workspace-stage #etf-tracker-panel .etf-table :is(th,td):nth-child(11){width:7%!important}
+}

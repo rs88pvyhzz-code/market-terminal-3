@@ -46,7 +46,7 @@ with sync_playwright() as p:
     assert 'periods with revenue, net income and operating cash flow' in page.locator('#company-coverage-gaps').text_content()
     assert page.locator('footer,[role=contentinfo]').count()==0
     assert page.locator("#company-news-list article").count()<=3
-    assert page.locator("#company-chart").is_visible()
+    assert page.locator("#company-benchmark-chart").is_visible() and not page.locator("#company-chart").is_visible()
     if not data.get("demo"):page.screenshot(path="/tmp/release29-company-ipad.png",full_page=True)
     page.locator("#research-tab-2").click()
     page.wait_for_timeout(150)
@@ -60,7 +60,7 @@ with sync_playwright() as p:
         assert page.locator(selector).evaluate("(e)=>getComputedStyle(e).maxHeight==='none'&&e.scrollHeight<=e.clientHeight+2"),selector
     assert page.locator("#gilt-freshness").count()==1
     page.locator("#tab-etfs").click()
-    assert page.locator("#etf-tracker-panel .etf-table thead th").count()==10
+    assert page.locator("#etf-tracker-panel .etf-table thead th").count()==11
     assert page.locator("#etf-tracker-panel .etf-table-scroll").count()>=1
     for width,height in [(1440,900),(1024,768),(390,844)]:
         page.set_viewport_size({"width":width,"height":height})

@@ -99,7 +99,7 @@ function sectionLinks(){
 }
 
 function renderYieldSnapshot(){
- // Curve strip at the top of Yield curves only: level and day change by tenor, plus 2s10s.
+ // Yield-curve summary: yield levels, change since the prior available observation, and 10Y minus 2Y.
  const rates=$L('rates');if(!rates)return;
  $L('layout-yield-snapshot')?.remove();
  let host=$L('layout-curve-strip');if(host&&host.dataset.ready)return;
@@ -110,7 +110,7 @@ function renderYieldSnapshot(){
   ['US · Treasury',D.us_rates,{'2Y':'DGS2','5Y':'DGS5','10Y':'DGS10','20Y':'DGS20','30Y':'DGS30'}],
   ['Euro area · ECB',D.eu_rates,{'2Y':'eur2y','5Y':'eur5y','10Y':'eur10y','20Y':'eur20y','30Y':'eur30y'}]];
  const table=document.createElement('table');table.className='watch layout-curve-table';
- const head=document.createElement('tr');for(const t of ['',...TENORS,'2s10s','As of']){const th=document.createElement('th');th.textContent=t;if(t&&t!=='As of')th.className='n';head.append(th);}
+ const head=document.createElement('tr');for(const t of ['',...TENORS,'10Y − 2Y (bp)','As of']){const th=document.createElement('th');th.textContent=t;if(t&&t!=='As of')th.className='n';head.append(th);}
  const thead=document.createElement('thead');thead.append(head);table.append(thead);
  const body=document.createElement('tbody');
  const bp=x=>{const r=Math.round(x);return (r>0?'+':r<0?'−':'')+Math.abs(r)+' bp';};
@@ -132,10 +132,15 @@ function renderYieldSnapshot(){
    if(Number.isFinite(sp)){const c=document.createElement('div');const d=sl-sp;c.className='layout-curve-chg '+(d>0?'up':d<0?'down':'');c.textContent=bp(d);td.append(c);}}
   else td.textContent='—';
   tr.append(td);
-  const date=document.createElement('td');date.textContent=last?.date||'—';tr.append(date);
+  const date=document.createElement('td');const observed=last?.date||'';
+  date.textContent=/^\d{4}-\d{2}-\d{2}$/.test(observed)?observed.slice(8,10)+'/'+observed.slice(5,7)+'/'+observed.slice(2,4):(observed||'—');
+  date.title='Actual source observation date: '+(observed||'unavailable')+'. Website refresh: '+(D.generatedAt||'unknown')+'.';tr.append(date);
   body.append(tr);
  }
  table.append(body);host.append(table);
+ const note=document.createElement('p');note.className='note layout-curve-explainer';
+ note.textContent='Large figures: yield levels (%). Small figures: changes in basis points since the previous available source observation, not necessarily the previous calendar day. 10Y − 2Y measures curve steepness; positive means the 10-year yield is higher. UK spot, US Treasury and ECB curves use different methods. Dates are observations, not website update times; — means not available.';
+ host.append(note);
 }
 
 function renderWatchFreshness(){
@@ -772,11 +777,12 @@ setTimeout(applyLayout,150);
       if(w.closest('#view-quality')||w.parentElement?.closest(WRAPS))continue;
       const body=w.querySelector('tbody');if(!body)continue;
       const rows=[...body.rows].filter(r=>!/group|geo/.test(r.className));
-      const key=wrapKey(w),open=expanded.has(key),over=rows.length>LIMIT;
+      const limit=['gilt-rows','ust-rows'].includes(body.id)?10:LIMIT;
+      const key=wrapKey(w),open=expanded.has(key),over=rows.length>limit;
       let n=0;
       for(const r of body.rows){
         const isGroup=/group|geo/.test(r.className);if(!isGroup)n++;
-        const keep=open||!over||n<=LIMIT||r.matches('.etf-active,.selected,.active,[aria-selected=true]');
+        const keep=open||!over||n<=limit||(limit!==10&&r.matches('.etf-active,.selected,.active,[aria-selected=true]'));
         if(r.classList.contains('polish-cut')===keep)r.classList.toggle('polish-cut',!keep);
       }
       let btn=w.nextElementSibling?.classList.contains('polish-more')?w.nextElementSibling:null;
@@ -1011,7 +1017,7 @@ setTimeout(applyLayout,150);
   // Dates: one style everywhere. "2027-01-29" -> "29 Jan 2027"; "2026-11-13 21:15" -> "13 Nov 2026, 21:15";
   // "2026 SEP" -> "Sep 2026"; "2026 Q2" -> "Q2 2026".
   const ISO=/\b(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}:\d{2})(?::\d{2})?)?(?: UTC)?\b/g;
-  const niceDate=t=>t.replace(ISO,(m,y,mo,d,hm)=>`${+d} ${MONTHS[+mo-1]} ${y}`+(hm?', '+hm:''))
+  const niceDate=t=>t.replace(ISO,(m,y,mo,d,hm)=>`${d}/${mo}/${y.slice(-2)}`+(hm?', '+hm:''))
                      .replace(/^(\d{4}) ([A-Z]{3})$/,(m,y,mo)=>mo[0]+mo.slice(1).toLowerCase()+' '+y)
                      .replace(/^(\d{4}) (Q[1-4])$/,'$2 $1')
                      .replace(/^(\d{4})-(\d{2})$/,(m,y,mo)=>MONTHS[+mo-1]+' '+y);
