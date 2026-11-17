@@ -2608,19 +2608,34 @@ function watchlistNews(w,q){
  $('watchlist-news-time').textContent=saved?'Retrieved '+(saved.retrievedAt||'date unavailable'):'No stored company news';
  $('watchlist-news-context').textContent=(q?.changePct!=null?w.name+' '+pc(q.changePct)+' on '+(q.asOf||'unknown date')+'. ':'')+
   'Related articles are search matches, not evidence that a story caused the share-price move. Verify company announcements and corporate actions.';
- for(const article of articles.filter(x=>newsDateMatches(x)).slice(0,7)){
-  if(!String(article.url||'').startsWith('https://'))continue;
+ // Exclude generic quotation and headline-index pages; these are navigation,
+ // not company developments. Preserve sourced issuer and publisher articles.
+ const seen=new Set(),material=articles.filter(x=>{
+  const title=String(x.title||'').trim(),url=String(x.url||'');
+  if(!newsDateMatches(x)||!url.startsWith('https://')||!title)return false;
+  if(/stock price,? news|quote (?:and|&) history|latest stock news and headlines|historical data|stock quote|share price (?:today|and news)/i.test(title))return false;
+  if(/finance\.yahoo\.com\/(?:quote|news)\/[^/?#]+\/?(?:\?.*)?$/i.test(url))return false;
+  const key=url.split('?')[0].replace(/\/$/,'').toLowerCase();
+  if(seen.has(key))return false;seen.add(key);return true;
+ });
+ for(const article of material.slice(0,5)){
   const item=el('article','company-story'),a=el('a','',article.title||'Open news source');a.href=article.url;a.target='_blank';a.rel='noopener noreferrer';
   item.append(a,el('span','',(article.source||'Publisher')+' · '+(article.published||'Date unavailable')));host.append(item);
  }
- if(!host.children.length)host.append(el('p','note',newsEmptyText()));
+ if(!host.children.length)host.append(el('p','note','No material company articles in the verified snapshot. Use SEARCH LATEST NEWS for a wider search.'));
  $('watchlist-news-live').href=companyNewsSearch(w.name);
  $('watchlist-quote-link').href=w.assetType==='fund'?'https://www.vanguardinvestor.co.uk/investments':'https://finance.yahoo.com/quote/'+encodeURIComponent(w.symbol)+'/';
 }
 function renderWatchlistEvents(w){
  const host=$('watchlist-events');host.replaceChildren();
- const dates=(D.company_events||[]).filter(e=>e.symbol===w.symbol).sort((a,b)=>String(a.date||'').localeCompare(String(b.date||''))).slice(0,6);
- if(!dates.length){host.append(el('p','note','No dated results or dividend events were retrieved for this security. Check the issuer investor-relations site.'));return;}
+ const dates=(D.company_events||[]).filter(e=>e.symbol===w.symbol&&/\d{4}-\d{2}-\d{2}/.test(String(e.date||'')))
+  .sort((a,b)=>String(a.date||'').localeCompare(String(b.date||''))).slice(0,6);
+ const eventsPanel=host.closest('.watchlist-events'),newsContext=$('watchlist-news-context');
+ let note=$('watchlist-events-inline-note');
+ if(!note&&newsContext){note=el('p','note','No confirmed upcoming results or dividend dates in this snapshot.');note.id='watchlist-events-inline-note';newsContext.after(note);}
+ if(eventsPanel)eventsPanel.hidden=!dates.length;
+ if(note)note.hidden=!!dates.length;
+ if(!dates.length)return;
  for(const event of dates){const box=el('div','watchlist-event');box.append(el('span','event-date',(event.date||'Date unavailable')+' · '+(event.type||'Event')),
   el('span','',event.title||'Company event'),el('span','mini',event.status||'Source not verified'));
   if(String(event.sourceUrl||'').startsWith('https://')){const a=el('a','','SOURCE');a.href=event.sourceUrl;a.target='_blank';a.rel='noopener noreferrer';box.append(a);}
