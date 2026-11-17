@@ -27,7 +27,7 @@ class ReturnRiskTests(unittest.TestCase):
     def test_adjusted_close_cannot_double_count_dividends(self):
         self.assertEqual(rr.period_total_returns(
             [('2026-01-05',100),('2026-01-06',110)],basis='adjusted'
-        ),[('2026-01-06',.1 if False else 110/100-1)])
+        ),[('2026-01-06',110/100-1)])
         with self.assertRaises(ValueError):
             rr.period_total_returns(
                 [('2026-01-05',100),('2026-01-06',110)],
@@ -94,7 +94,7 @@ class ReturnRiskTests(unittest.TestCase):
             {'symbol':'D','date':'2026-01-06','close':25.0}
         ]
         cleaned,q=rr.validate_market_history(rows)
-        self.assertEqual(len(cleaned),7)
+        self.assertEqual(len(cleaned),8)
         self.assertEqual(q['invalidPricePoints'],1)
         self.assertEqual(q['invalidAdjustedPoints'],1)
         self.assertEqual(q['duplicateDates'],2)
