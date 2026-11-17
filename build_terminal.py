@@ -34,6 +34,7 @@ import market_intelligence
 import market_fundamentals
 import market_price_history
 import market_analytics
+import return_risk
 import gilt_market
 import us_treasury_market
 import economic_forecasts
@@ -262,7 +263,10 @@ def fetch_quote(info, opts):
           'asOf':dt.datetime.fromtimestamp(quote_time,dt.timezone.utc).strftime('%Y-%m-%d %H:%M UTC'),
           'delayedMin':m.get('exchangeDataDelayedBy'),
           'cached':cached,'cacheDetail':info_msg,'source':'Yahoo Finance',
-          'adjustedAvailable':len(adj_by_day)>=2
+          'adjustedAvailable':len(adj_by_day)>=2,
+          'returnBasis':('Dividend-adjusted close proxy (Yahoo, not verified NAV)'
+                          if kind in ('etf','equity') and len(adj_by_day)>=2
+                          else 'Price only (dividends excluded)')
         }
         hh=[{'date':date,'symbol':symbol,'close':rounded(val,5),
              **({'adjClose':rounded(adj_by_day[date],5)} if date in adj_by_day else {})} for date,val in pts]
@@ -499,6 +503,18 @@ def build(opts):
         print(f'Intraday 30-minute bars: {len(intraday)}/{len(quotes)} instruments',flush=True)
     order={rec[1]:i for i,rec in enumerate(INSTRUMENTS)}
     quotes.sort(key=lambda x:order[x['symbol']]);hist.sort(key=lambda x:(order[x['symbol']],x['date']))
+    # Quarantine defective individual observations; do not fail a complete
+    # source download because one instrument supplied a bad close or duplicate.
+    hist,return_validation=return_risk.validate_market_history(hist)
+    if (return_validation['invalidPricePoints'] or return_validation['invalidAdjustedPoints']
+            or return_validation['conflictingDates']):
+        warnings.append('Historical return validation quarantined '+
+            str(return_validation['invalidPricePoints'])+' invalid closes, '+
+            str(return_validation['invalidAdjustedPoints'])+' invalid adjusted closes and '+
+            str(return_validation['conflictingDates'])+' conflicting dates; details in Data Quality.')
+    if return_validation['suspiciousMoveSymbols']:
+        warnings.append('Suspicious historical return windows (not rewritten): '+
+            ', '.join(return_validation['suspiciousMoveSymbols'][:15]))
     try:
         uk,b_c,boe_msg=parse_boe(opts);cached_count+=int(b_c)
         if 'stale cache' in boe_msg: warnings.append('BoE: stale cached response')
@@ -679,6 +695,14 @@ def build(opts):
     warnings.extend(issuer_warnings);cached_count+=issuer_cached
     etf_data=etf_consolidation.enrich(etf_data)
     quality=build_quality(quotes,hist,movers,fundamentals,fcoverage,calendar,gilts,us_bonds,macro,warnings)
+    quality['returnValidation']=return_validation
+    quality['returnMethod']={
+        'equitiesEtfs':'Actual Yahoo dividend/split-adjusted closes where available; proxy, not NAV',
+        'marketIndices':'Price only unless a separately identified official total-return index is supplied',
+        'doubleCountPrevention':'Never add cash dividend events to Yahoo adjClose',
+        'sharpe':'Not calculated without a dated, currency-matched overnight risk-free series',
+        'annualisation':'Daily exchange-traded returns use 252; weekly data use 52; calendar-daily crypto requires 365'
+    }
     quality['personalWatchlist']=watch_coverage
     quality['priceHistory']=history_coverage
     return {'etfTracker':etf_data,'personalWatchlist':watchlist,'watchlist_quotes':watch_quotes,'watchlist_history':watch_history,
