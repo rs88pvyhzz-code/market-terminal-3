@@ -22,6 +22,7 @@ Stages
                                  tab layout is the final word on placement
 """
 import argparse
+import json
 import re
 import subprocess
 import sys
@@ -168,6 +169,31 @@ def inject_layout(html_path):
     print(f'   layout injected into {html_path.name}')
 
 
+def record_verified_calculation_audit(html_path):
+    """Audit only after every required verification and post-processing stage.
+
+    Public metadata only; this does not embed a new panel or personal portfolio
+    information into the terminal.
+    """
+    import calculation_audit
+    html = Path(html_path).read_text("utf-8")
+    marker = re.search(r"window\.MT_DATA\s*=\s*", html)
+    if marker is None:
+        raise SystemExit("Verified build has no snapshot payload to audit")
+    try:
+        payload, _ = json.JSONDecoder().raw_decode(html, marker.end())
+    except (TypeError, ValueError) as exc:
+        raise SystemExit("Verified snapshot cannot be parsed for audit") from exc
+    record = calculation_audit.create_record(payload, method_root=ROOT)
+    appended = calculation_audit.append_verified(
+        record,
+        local_path=ROOT / ".terminal_sources" / "calculation_audit.jsonl",
+        published_path=ROOT / "public" / "calculation_audit.jsonl",
+    )
+    print("   verified calculation audit: " + appended["recordSha256"][:16] +
+          " · public/calculation_audit.jsonl", flush=True)
+
+
 def main():
     argv = sys.argv[1:]
     passthrough = []
@@ -200,6 +226,7 @@ def main():
 
     if a.verify:
         run('News provenance and coverage', ['verify_market_briefing.py', html], required=a.strict_news)
+        record_verified_calculation_audit(html)
     print(f'\nBuilt {html}')
 
 
