@@ -280,6 +280,29 @@ def collect(core,opts):
             pts={str(x[0]):float(x[1]) for x in prior.get(key,[]) if isinstance(x,list) and len(x)==2}
             pts[b['asOf']]=float(b['askClean'])
             prior[key]=[[day,price] for day,price in sorted(pts.items())][-1500:]
+    # A line between just two old/new quotes looks like invented daily prices.
+    # Attempt a bounded, independently validated D10B backfill for active gilts.
+    # Each historical report must state EXACTLY its requested trading date.
+    history_attempts=[]
+    sample=next((b['isin'] for b in rows if b.get('quoted')),None)
+    if not opts.offline and selected_fresh and sample and len(prior.get(sample,[]))<5:
+        start_day=dt.date.fromisoformat(latest['asOf'])-dt.timedelta(days=1)
+        for day in _recent_business_days(start_day,count=5,holidays=calendar['holidays']):
+            if len(prior.get(sample,[]))>=5:break
+            report=_download_dmo_for(day,history_attempts)
+            if not report:
+                if history_attempts[-1].get('httpStatus') in (403,429):break
+                continue
+            # Never import a historic report as the LATEST valuation quote.
+            for bond in report['bonds']:
+                if not bond.get('quoted') or not bond.get('isin') or fnum(bond.get('askClean')) is None:continue
+                key=bond['isin']
+                observations={str(x[0]):float(x[1]) for x in prior.get(key,[])
+                    if isinstance(x,list) and len(x)==2 and fnum(x[1]) is not None}
+                observations[report['asOf']]=float(bond['askClean'])
+                prior[key]=[[date,value] for date,value in sorted(observations.items())][-1500:]
+    diagnostics['historyBackfill']=history_attempts
+    diagnostic_path.write_text(json.dumps(diagnostics,indent=2))
     HISTORY.write_text(json.dumps(prior,separators=(',',':')),encoding='utf-8')
     history=[{'ticker':g['ticker'],'date':d,'close':v}
              for g in rows for d,v in prior.get(g['ticker'],[])][-15000:]
