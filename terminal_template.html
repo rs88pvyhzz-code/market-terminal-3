@@ -1231,13 +1231,13 @@ function renderWatch(){const body=$('watch-rows');body.replaceChildren();let row
   td(tr,move(q,'year'),'n '+tone(moveVal(q,'year')));
   for(const k of ['three','five']){const v=watchLongReturn(q,k);td(tr,v==null?'—':pc(v),'n '+tone(v));}
   const rangeCell=td(tr,'','n hide-sm');
-  if(Number.isFinite(q.low52)&&Number.isFinite(q.high52)&&q.high52>q.low52&&Number.isFinite(q.price)){
+  if(Number.isFinite(q.low52)&&q.low52>0&&Number.isFinite(q.high52)&&q.high52>q.low52&&Number.isFinite(q.price)&&q.price>0){
     const position=100*(q.price-q.low52)/(q.high52-q.low52);
     const track=el('div');track.style.cssText='position:relative;height:5px;background:#495260;margin:8px 5px';
     const marker=el('span');marker.style.cssText='position:absolute;top:-4px;width:3px;height:13px;background:#83d4ff;left:'+Math.max(0,Math.min(100,position))+'%';track.append(marker);
     rangeCell.append(el('div','',fmt(q.low52/quoteScale(q),prec(q))+' – '+fmt(q.high52/quoteScale(q),prec(q))),track);
     rangeCell.title=Math.round(position)+'% of the way from the 52-week low to high';track.setAttribute('role','img');track.setAttribute('aria-label',rangeCell.title);
-  }else rangeCell.textContent='—';const quoteDate=td(tr,q.asOf?String(q.asOf).slice(0,10):'—','hide-sm');quoteDate.title=q.asOf||'Source timestamp unavailable';
+  }else{rangeCell.textContent='—';rangeCell.title='Unavailable: invalid or incomplete sourced 52-week low/high.';}const quoteDate=td(tr,q.asOf?String(q.asOf).slice(0,10):'—','hide-sm');quoteDate.title=q.asOf||'Source timestamp unavailable';
   tr.onclick=()=>{state.sym=q.symbol;$('main-pick').value=q.symbol;renderMain();renderWatch();};body.append(tr);}
 }
 function healthcareComparison(asset,benchmark){
@@ -4115,7 +4115,9 @@ function forensicClaude(){
 }
 
 function renderGilts(){
-  const table=$('gilt-rows');table.replaceChildren();
+  const table=$('gilt-rows'),viewport=table.closest('.gilt-table-scroll');
+  const previousScrollTop=viewport?.scrollTop||0,previousScrollLeft=viewport?.scrollLeft||0;
+  table.replaceChildren();
   const rows=giltList.filter(g=>(giltState.type==='all'||(giltState.type==='linked'&&g.indexLinked)||(giltState.type==='conventional'&&!g.indexLinked))&&
     (!giltState.search||[g.name,g.ticker,g.shortTicker,g.isin,g.maturity].join(' ').toLowerCase().includes(giltState.search)));
   const count=giltList.filter(g=>g.quoted).length,linked=giltList.filter(g=>g.indexLinked).length;
@@ -4140,13 +4142,15 @@ function renderGilts(){
     
     tr.onclick=()=>{giltState.symbol=g.ticker;renderGilts();};table.append(tr);
   }
+  if(viewport){viewport.scrollTop=previousScrollTop;viewport.scrollLeft=previousScrollLeft;}
   const b=giltList.find(g=>g.ticker===giltState.symbol);
   if(!b){mtRenderGiltTax(null,null,false);$('gilt-selected').textContent='NO GILT DATA AVAILABLE';$('gilt-stats').replaceChildren();empty('gilt-chart','No bonds returned.');return;}
   const review=giltYieldReviewReason(b),reviewHost=$('gilt-yield-review');reviewHost.hidden=!review;reviewHost.textContent=review?'DERIVED YIELDS REQUIRE REVIEW · '+review+' Excluded from automatic yield ranking and gilt-ladder optimisation. Official DMO prices and security data are retained.':'';
   $('gilt-selected').textContent=b.name+'  ·  '+(b.shortTicker||b.isin);
   $('gilt-selected-source').textContent=b.asOf?'DMO source date: '+b.asOf:'No verified DMO quotation';
   const input=$('gilt-clean-input'),user=giltState.manual.get(b.ticker);
-  input.value=user!=null?String(user):(b.askClean!=null?String(b.askClean):'');
+  // Do not overwrite an in-progress numeric edit (e.g. "95.") on each keypress.
+  if(document.activeElement!==input)input.value=user!=null?String(user):(b.askClean!=null?String(b.askClean):'');
   $('gilt-price-basis').textContent=user!=null?'USER PRICE (today)':b.quoted?'DMO HISTORICAL OFFER ('+b.asOf+')':'NO MARKET QUOTE';
   const price=input.value!==''?Number(input.value):null;
   const v=price!=null&&!b.indexLinked?giltValuation(b,price,user!=null?(D.generatedAt||'').slice(0,10):b.asOf,user==null?b.askDirty:null):null;
