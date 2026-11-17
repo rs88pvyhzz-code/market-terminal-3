@@ -6,4 +6,4 @@ Source: https://www.dmo.gov.uk/umbraco/surface/DataExport/GetDataExport?reportCo
 
 SHA-256: `dc06be01982ca45b2b448a6d2dab678ce280fc6562f30ac5fa7dcc520ba8d6b3`
 
-Upload later original official XLS/XLSX exports here without altering their contents. See [update instructions](../RELEASE22_RELIABILITY_NAVIGATION.md).
+Upload later original official XLS/XLSX exports here without altering their contents. See [update instructions](../../docs/RELEASE22_RELIABILITY_NAVIGATION.md).
