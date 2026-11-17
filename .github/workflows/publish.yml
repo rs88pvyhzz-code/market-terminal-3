@@ -75,6 +75,8 @@ jobs:
             terminal.sources.json
             public/news_verification.json
             .terminal_sources/requests.jsonl
+            .terminal_sources/calculation_audit.jsonl
+            public/calculation_audit.jsonl
 
       - name: Prepare website and persistent cache
         run: |
