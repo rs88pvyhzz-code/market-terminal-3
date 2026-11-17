@@ -43,7 +43,7 @@ with sync_playwright() as p:
     assert 'Latest annual period:' in page.locator('#company-coverage-gaps').text_content()
     assert 'periods with revenue, net income and operating cash flow' in page.locator('#company-coverage-gaps').text_content()
     assert page.locator('footer,[role=contentinfo]').count()==0
-    assert page.locator('#company-chart').is_visible()
+    assert page.locator('#company-benchmark-chart').is_visible() and not page.locator('#company-chart').is_visible()
     page.locator('#research-tab-2').click()
     assert page.locator('#research-valuation .t11-metric').count()==6
     assert page.locator('#research-valuation input').count()==0
@@ -54,7 +54,7 @@ with sync_playwright() as p:
     assert page.locator('#mt-risk-comparison').is_visible()
     assert page.locator('#analytics-rolling').count()==1
     page.locator('#tab-etfs').dispatch_event('click')
-    assert page.locator('#etf-tracker-panel .etf-table thead th').count()==10
+    assert page.locator('#etf-tracker-panel .etf-table thead th').count()==11
     assert page.locator('#etf-tracker-panel .etf-table-scroll').evaluate("(e)=>getComputedStyle(e).maxHeight==='none'&&e.scrollHeight<=e.clientHeight+2")
     page.locator('#tab-bonds').dispatch_event('click')
     for selector in ['#gilts .gilt-table-scroll','#ust-securities-scroll']:
