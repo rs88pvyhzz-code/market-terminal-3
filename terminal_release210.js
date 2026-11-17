@@ -39,6 +39,23 @@ r24Snapshot=function(){
   host.append(tile);
  }
  host.dataset.count=String(host.children.length);
+ // Published official yield observations can lag the prior UK/US business day.
+ // Do not silently present Friday's official yield as Monday's closing yield.
+ const latestUK=(D.uk_rates||[]).filter(r=>Number.isFinite(Number(r.gilt10y))).at(-1);
+ const latestUS=(D.us_rates||[]).filter(r=>Number.isFinite(Number(r.DGS10))).at(-1);
+ const stamp=String(D.generatedAt||'').slice(0,10),expected=new Date(stamp+'T12:00:00Z');
+ if(Number.isFinite(expected.valueOf())){
+   expected.setUTCDate(expected.getUTCDate()-1);
+   while([0,6].includes(expected.getUTCDay()))expected.setUTCDate(expected.getUTCDate()-1);
+ }
+ const expectedDate=Number.isFinite(expected.valueOf())?expected.toISOString().slice(0,10):'';
+ let lag=$r('r210-official-yield-lag');
+ if(!lag){lag=el('p','note r210-official-yield-lag');lag.id='r210-official-yield-lag';host.after(lag);}
+ const lagged=[['UK 10Y spot',latestUK?.date],['US 10Y Treasury',latestUS?.date]]
+  .filter(([,date])=>!date||expectedDate&&date<expectedDate);
+ lag.textContent=lagged.length?'Official yield release lag: '+lagged.map(([name,date])=>name+' '+(date||'unavailable')).join(' · ')+
+  '. Prior business day '+(expectedDate||'unknown')+' not yet available in this verified source. DMO individual gilt prices are a separate data feed.':'';
+ lag.hidden=!lagged.length;
  const existing=$r('r210-snapshot-note');
  if(!existing){
   const note=el('p','mini r210-market-note','14 dated indicators · quoted units shown in labels · EEM is an ETF proxy for emerging equities, not an official emerging-markets index · US 10Y is the official Treasury yield series.');

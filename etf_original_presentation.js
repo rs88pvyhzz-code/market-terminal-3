@@ -141,6 +141,15 @@ function etfV5PickMain(){
   }
   return {all,shown:all.filter(f=>keep.has(f.symbol)),suppressed:all.length-keep.size};
 }
+// Main table only: round DISPLAYED AUM to whole millions/billions.
+ // Keep the full verified issuer value, currency and source in the tooltip.
+function etfCompactFundSize(f){
+ const exact=String(etfFundSize(f));
+ const match=exact.match(/^([£$€])([\d,.]+)\s*(tn|bn|m)$/i);
+ if(!match)return exact;
+ const amount=Number(match[2].replace(/,/g,''));
+ return Number.isFinite(amount)?match[1]+Math.round(amount).toLocaleString('en-GB')+match[3]:exact;
+}
 function etfShortMove(f,k){
   try{const rows=etfRows(f,'MAX','adjusted_local');if(rows.length<2)return null;
     const last=rows[rows.length-1];let base=null;
@@ -177,7 +186,7 @@ renderEtfTracker=function(){
     const name=etfCell(row,'');name.append(el('span','etf-compact-fund',f.name),el('span','etf-compact-sub',f.symbol+' · '+f.market));
     const fee=etfCell(row,etfFee(f),'n');fee.title=(f.terSource||f.terStatus||'Unverified')+(f.terCheckedAt?' · '+f.terCheckedAt:'');
     const [code,label]=etfV5Kind(f);const codecell=etfCell(row,code,'etf-compact-code');codecell.title=label+' · '+(f.replicationStatus||'unverified');
-    const aum=etfCell(row,etfFundSize(f),'n');aum.title=(f.fundSizeSource||'Fund AUM unverified')+(f.fundSizeAsOf?' · '+f.fundSizeAsOf:'');
+    const aum=etfCell(row,etfCompactFundSize(f),'n');aum.title='Full sourced AUM: '+etfFundSize(f)+' · '+(f.fundSizeSource||'Fund AUM unverified')+(f.fundSizeAsOf?' · '+f.fundSizeAsOf:'');
     for(const y of ['1D','1W','1M']){const v=etfShortMove(f,y);const c=etfCell(row,v==null?'—':etfPct(v),'n');c.title=y==='1D'?'Last close against previous close':y==='1W'?'Last close against close one week earlier':'Last close against close one month earlier';}
     for(const y of ['1Y','3Y','5Y']){
       // No silent fallback to price returns: only dated adjusted closing prices.

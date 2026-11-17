@@ -73,11 +73,12 @@ function mtRenderGiltSummary(host,statRows,b,v,clean,manual){
 function mtGiltChartVisibility(count){
  const chartNode=document.getElementById('gilt-chart'),pills=document.getElementById('gilt-period');
  const heading=pills?.closest('.row');
- const visible=count>=2;
- if(chartNode)chartNode.hidden=!visible;
- if(pills)pills.hidden=!visible;
- if(heading){const h=heading.querySelector('h3');if(h)h.textContent=visible?'INDIVIDUAL GILT PRICE HISTORY':'INDIVIDUAL PRICE HISTORY — NOT YET AVAILABLE';}
- if(!visible&&chartNode){const note=chartNode.nextElementSibling;if(note&&note.classList.contains('note'))note.textContent='One valid dated DMO offer snapshot is saved. The price history is suppressed until at least two different dated prices are available. Collection of historical D10B data remains unverified.';}
+ const visible=count>=5;
+ // Keep the period selector and honest empty-state message available even if
+ // a short selected range has too few actual daily DMO observations.
+ if(chartNode)chartNode.hidden=false;
+ if(pills)pills.hidden=false;
+ if(heading){const h=heading.querySelector('h3');if(h)h.textContent=visible?'INDIVIDUAL GILT PRICE HISTORY':'INDIVIDUAL GILT PRICE HISTORY · INSUFFICIENT SOURCED DATES';}
 }
 function mtCompanyAmount(x,currency,kind,obj){
  const choice=document.getElementById('mt-peer-currency')?.value||'native';
@@ -116,8 +117,8 @@ def patch_html(source: str, css: str, js: str) -> str:
         'mtRenderGiltSummary(host,st,b,v,price,user!=null);',
         'Gilt concise + advanced summary')
     source = replace_exact(source,
-        "else empty('gilt-chart',dates.length===1?'One DMO observation saved; the chart grows when later dated DMO files are collected.':'No historical DMO price snapshots yet.');",
-        "else empty('gilt-chart',dates.length===1?'One dated price: historical chart unavailable.':'No historical DMO price snapshots yet.');\n  mtGiltChartVisibility(pts.length);",
+        "else empty('gilt-chart','Insufficient verified daily price history ('+pts.length+' observations). Chart withheld rather than drawing a misleading straight line.');",
+        "else empty('gilt-chart','Insufficient verified daily price history ('+pts.length+' observations). Chart withheld rather than drawing a misleading straight line.');\n  mtGiltChartVisibility(pts.length);",
         'Gilt history visibility')
     source = replace_exact(source,
         "value=kind==='ratio'?fmt(x,1)+'×':kind==='pct'?fmt(x,2)+'%':companyAmount(x,currency);covered++;",

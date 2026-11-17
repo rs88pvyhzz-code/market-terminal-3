@@ -160,7 +160,11 @@ renderMacro=function(){
   const tile=tiles[i];if(!tile||!tile.matches('button'))return;
   tile.querySelectorAll('.r28-economic-sub').forEach(n=>n.remove());
   const p=index.get(m.key);const text=el('div','r28-economic-sub');
-  if(p?.previous!=null){
+  if(m.frequency==='policy'){
+   text.textContent=p?.policyChangeDate&&p.previous!=null
+    ?'Previous rate '+fmt(p.previous,2)+(p.unit||m.unit||'%')+' · changed '+datefmt(p.policyChangeDate)
+    :'Previous rate change unavailable in sourced history';
+  }else if(p?.previous!=null){
    text.textContent='Prior '+fmt(p.previous,2)+(p.unit||m.unit||'')+' · '+(p.previousPeriod||'previous period');
   }else text.textContent='Prior unavailable';
   tile.append(text);

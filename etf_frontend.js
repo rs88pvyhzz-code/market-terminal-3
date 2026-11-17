@@ -65,6 +65,12 @@ function etfRows(f,range=etfState.range,basis=etfState.basis){
   }).filter(Boolean);
   if(!points.length)return [];
   const clean=etfDespike(points);
+  if(range==='1D'){
+    // Latest two ACTUAL trading closes; not an intraday price chart.
+    if(clean.length<2)return [];
+    const gap=(Date.parse(clean.at(-1).date)-Date.parse(clean.at(-2).date))/86400000;
+    return gap>=1&&gap<=4?clean.slice(-2):[];
+  }
   const start=startOf(clean.at(-1).date,range);
   return clean.filter(p=>p.date>=start);
 }
@@ -293,7 +299,8 @@ function etfDrawChart(){
      outcome.className='etf-relative-outcome '+(move>0?'pos':move<0?'neg':'');
    }else{outcome.textContent=etfState.benchmark==='NONE'?'No benchmark selected':'Benchmark unavailable for these dated observations';outcome.className='etf-relative-outcome';}
  }
- if(note)note.textContent=(sterlingInvestment?'£10,000 invested on ':'Indexed to 100 on ')+datefmt(days[0])+' · through '+datefmt(days.at(-1))+
+ if(note)note.textContent=(etfState.range==='1D'?'1D means last two available trading closes, not intraday prices. ':'')+
+   (sterlingInvestment?'£10,000 invested on ':'Indexed to 100 on ')+datefmt(days[0])+' · through '+datefmt(days.at(-1))+
    ' · '+days.length+' exact matched trading dates'+(limited?' · PARTIAL '+etfState.range+' HISTORY':'')+
    '. '+(etfState.basis.startsWith('adjusted')?'Yahoo adjusted close is an unofficial total-return proxy. ':'Price-only diagnostic view excludes dividends. ')+
    (etfState.basis.endsWith('gbp')?'Both sides converted at dated FX observations. ':'Both sides must share their trading currency. ')+

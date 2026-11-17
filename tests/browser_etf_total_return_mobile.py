@@ -54,7 +54,7 @@ with sync_playwright() as playwright:
         assert page.locator('#etf-period').is_visible(),('period selector missing',width)
         assert page.locator('#etf-benchmark').is_visible(),('benchmark selector missing',width)
         assert page.locator('#layout-etf-performance #etf-period').count()==1,('controls separated from chart',width)
-        assert page.locator('#etf-period option').evaluate_all('(items)=>items.map(i=>i.value)')==['1W','1M','1Y','3Y','5Y','MAX']
+        assert page.locator('#etf-period option').evaluate_all('(items)=>items.map(i=>i.value)')==['1D','1W','1M','1Y','3Y','5Y','MAX']
         assert page.locator('#etf-benchmark').input_value()=='AUTO'
         print('BENCHMARK SELECTOR',width,'SELECTED',page.locator('#etf-selected').text_content(),
               'AUTO',page.locator('#etf-benchmark option').first.text_content(),
@@ -67,6 +67,10 @@ with sync_playwright() as playwright:
         assert 'S&P 500' in page.locator('#etf-relative-outcome').inner_text()
         page.locator('#etf-benchmark').select_option('FTSE250')
         assert 'FTSE 250' in page.locator('#etf-relative-outcome').inner_text()
+        # Synthetic benchmark fixture is weekly, so a 1D close-to-close
+        # graph must say unavailable rather than invent a daily move.
+        page.locator('#etf-period').select_option('1D')
+        assert 'No adjusted-price' in page.locator('#etf-chart').inner_text()
         for period in ['1W','1M','1Y','3Y','5Y','MAX']:
             page.locator('#etf-period').select_option(period)
             assert page.locator('#etf-chart svg path[stroke-width]').count()>=2,('period graph',width,period)

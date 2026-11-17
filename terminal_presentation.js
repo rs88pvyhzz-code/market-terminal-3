@@ -1291,10 +1291,13 @@ function t3SemanticColours(){
       mark(value,direction);
       if(!delta){delta=document.createElement('div');delta.className='t3-econ-delta';(prior||value||tile.lastChild).after(delta);}
       const unit=p.unit||m.unit||'';
-      const label=movement===0?'No change vs prior':(movement>0?'↑ +':'↓ −')+fmt(Math.abs(movement),2)+unit+' vs prior';
+      const policy=m.frequency==='policy'&&p.policyChangeDate;
+      const label=policy
+        ?(movement===0?'No recorded change':(movement>0?'↑ +':'↓ −')+fmt(Math.abs(Number(p.policyChangeBp??movement*100)),0)+' bp')+' · '+datefmt(p.policyChangeDate)
+        :movement===0?'No change vs prior':(movement>0?'↑ +':'↓ −')+fmt(Math.abs(movement),2)+unit+' vs prior';
       if(delta.textContent!==label)delta.textContent=label;
       mark(delta,direction);
-      delta.title='Increase/decrease since previous official observation; not a judgement about economic conditions.';
+      delta.title=policy?'Change from previous DISTINCT official policy rate on the shown effective date.':'Increase/decrease since previous official observation; not a judgement about economic conditions.';
     }
   }
   // Actual-vs-previous table: colour actual by direction, leave the prior
