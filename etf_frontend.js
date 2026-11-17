@@ -88,11 +88,10 @@ function etfRisk(f){
     const days=(Date.parse(one[i].date)-Date.parse(one[i-1].date))/86400000;
     if(days>=1&&days<=5)returns.push(one[i].v/one[i-1].v-1);
   }
-  let volatility=null;
-  if(returns.length>=150){
-    const mean=returns.reduce((s,x)=>s+x,0)/returns.length;
-    volatility=100*Math.sqrt(returns.reduce((s,x)=>s+(x-mean)**2,0)/(returns.length-1))*Math.sqrt(252);
-  }
+  // Same simple-return sample standard deviation as Watchlist and Research.
+  // There is currently no dated currency-matched overnight risk-free history
+  // here: an ETF Sharpe ratio must remain unavailable, not silently use 0%.
+  const volatility=returns.length>=150?annualizedRiskMetrics(returns,252).volatility:null;
   let peak=0,drawdown=null;
   for(const item of period){peak=Math.max(peak,item.v);if(peak>0)drawdown=Math.min(drawdown??0,100*(item.v/peak-1));}
   return {volatility,drawdown,n:returns.length,period:period.length};

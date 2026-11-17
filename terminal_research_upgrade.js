@@ -78,13 +78,17 @@ function panelForRisk(){
    const gaps=[],ret=[];let max=window[0].p,dd=0;
    for(let i=1;i<window.length;i++){const gap=(new Date(window[i].date+'T12:00:00Z')-new Date(window[i-1].date+'T12:00:00Z'))/86400000;
      if(gap<=0)return null;gaps.push(gap);
-     const r=Math.log(window[i].p/window[i-1].p);if(Math.abs(r)>Math.log(1.55))return null;ret.push(r);
+     const r=window[i].p/window[i-1].p-1;if(Math.abs(r)>.55)return null;ret.push(r);
      max=Math.max(max,window[i].p);dd=Math.min(dd,window[i].p/max-1);
    }
    const abnormal=gaps.filter(x=>x>6).length;if(abnormal>Math.max(2,gaps.length*0.01))return null;
+   // Standalone presentation module: use the same simple-return SAMPLE
+   // volatility formula as the main terminal (separate script scope).
    const mean=ret.reduce((a,b)=>a+b,0)/ret.length;
    const variance=ret.reduce((a,b)=>a+(b-mean)**2,0)/(ret.length-1);
-   return {growth:100*((last.p/window[0].p)**(365.25/days)-1),vol:Math.sqrt(variance*252)*100,draw:dd*100,n:window.length};
+   const volatility=Math.sqrt(252*variance)*100;
+   return {growth:100*((last.p/window[0].p)**(365.25/days)-1),
+     vol:volatility,draw:dd*100,n:window.length};
  }
  function paint(){const years={'1Y':1,'3Y':3,'5Y':5}[document.getElementById('mt-risk-period').value]||1,
   inGBP=document.getElementById('mt-risk-currency')?.value==='gbp';
@@ -114,6 +118,18 @@ function setupQuality(){
   ['Issuer-confirmed events',D.companyEventCoverage?.issuerSourced??0],
   ['Download warnings',warnings.length]
  ]){const card=make('div','mt-quality-card');card.append(make('span','',label),make('strong','',String(val)));strip.append(card);}summary.append(strip);
+ const validation=q.returnValidation;
+ if(validation){
+   const warning=make('p','note',
+     'Historical return check: '+validation.validPoints+' / '+validation.inputPoints+
+     ' valid observations; '+validation.invalidPricePoints+' invalid prices, '+
+     validation.invalidAdjustedPoints+' invalid dividend-adjusted prices, '+
+     validation.conflictingDates+' conflicting dates quarantined. '+
+     (validation.suspiciousMoveSymbols.length
+       ?'Suspicious windows (not overwritten): '+validation.suspiciousMoveSymbols.slice(0,8).join(', ')+'. '
+       :'')+'No dividend or FX observations were fabricated.');
+   summary.append(warning);
+ }
  const invalidRanges=(D.quotes||[]).filter(x=>Number.isFinite(x.low52)&&x.low52<=0&&Number.isFinite(x.high52)&&x.high52>0);
  const missingCurrency=(D.quotes||[]).filter(x=>x.group==='Equities'&&!(x.currency||'').trim());
  if(invalidRanges.length||missingCurrency.length){
