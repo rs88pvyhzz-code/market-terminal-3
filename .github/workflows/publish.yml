@@ -28,7 +28,7 @@ jobs:
       MT_SEED_PAGES: https://rs88pvyhzz-code.github.io/Market-terminal-2/
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      url: ${{ steps.deploy1.outputs.page_url || steps.deploy2.outputs.page_url || steps.deploy3.outputs.page_url }}
     steps:
       - name: Check out files
         uses: actions/checkout@v4
@@ -98,6 +98,30 @@ jobs:
         with:
           path: public
 
+      # deploy-pages intermittently fails with "Fetching artifact metadata
+      # failed ... No artifacts named github-pages" even though the upload
+      # step succeeded (6 of the last 40 runs, Nov 2026). It fails before any
+      # deployment is created, so retrying the same artifact is safe.
       - name: Publish website
-        id: deployment
+        id: deploy1
+        continue-on-error: true
+        uses: actions/deploy-pages@v4
+
+      - name: Wait before publish retry
+        if: steps.deploy1.outcome == 'failure'
+        run: sleep 30
+
+      - name: Publish website (retry 1)
+        id: deploy2
+        if: steps.deploy1.outcome == 'failure'
+        continue-on-error: true
+        uses: actions/deploy-pages@v4
+
+      - name: Wait before final publish retry
+        if: steps.deploy1.outcome == 'failure' && steps.deploy2.outcome == 'failure'
+        run: sleep 90
+
+      - name: Publish website (retry 2)
+        id: deploy3
+        if: steps.deploy1.outcome == 'failure' && steps.deploy2.outcome == 'failure'
         uses: actions/deploy-pages@v4
