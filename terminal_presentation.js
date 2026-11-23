@@ -323,9 +323,14 @@ const PULSE_ORDER=[/^FTSE 100/,/^S&P 500/,/^Nasdaq/,/STOXX 600/,/Nikkei/,/Emergi
 function orderPulse(){
   document.querySelectorAll('#overview-board .r24-snapshot-item').forEach(item=>{
     const label=(item.firstElementChild&&item.firstElementChild.textContent||'').trim();
-    const i=PULSE_ORDER.findIndex(re=>re.test(label));item.style.order=String(i<0?50:i);
+    const i=PULSE_ORDER.findIndex(re=>new RegExp(re.source,'i').test(label));item.style.order=String(i<0?50:i);
   });
 }
+// The pulse tiles are rebuilt from several paths (Analytics paint, briefing render,
+// release-210 load check) that do not re-run the layout pass. Order them in the same
+// call that builds them so they never paint in raw order and then jump.
+try{const baseSnap=r24Snapshot;r24Snapshot=function(){const r=baseSnap.apply(this,arguments);try{orderPulse();}catch(e){}return r;};}catch(e){}
+try{const basePulse=renderPulse;renderPulse=function(){const r=basePulse.apply(this,arguments);try{orderPulse();}catch(e){}return r;};}catch(e){}
 
 // ETF Trackers: catalogue counts belong in Data Quality; tidy duplicated or hedged labels.
 function tidyEtf(){
