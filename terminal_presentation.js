@@ -332,6 +332,65 @@ function orderPulse(){
 try{const baseSnap=r24Snapshot;r24Snapshot=function(){const r=baseSnap.apply(this,arguments);try{orderPulse();}catch(e){}return r;};}catch(e){}
 try{const basePulse=renderPulse;renderPulse=function(){const r=basePulse.apply(this,arguments);try{orderPulse();}catch(e){}return r;};}catch(e){}
 
+// Market session labels on pulse tiles: say plainly when an exchange is shut
+// (weekend, holiday, before open, after close) so an old date is not mistaken for
+// a data failure. Judged from the viewer's clock, so it stays right on a static page.
+// Holiday lists: UK from gov.uk; NYSE, Tokyo and Eurex from the exchanges' published
+// calendars for 2026-27. Unlisted closures fall back to "No trading today".
+const MKT_SESSIONS=[
+  {re:/^FTSE 100|EMIM/i,tz:'Europe/London',open:[8,0],close:[16,30],name:'London',
+   hol:['2026-01-01','2026-04-03','2026-04-06','2026-05-04','2026-05-25','2026-08-31','2026-12-25','2026-12-28',
+        '2027-01-01','2027-03-26','2027-03-29','2027-05-03','2027-05-31','2027-08-30','2027-12-27','2027-12-28']},
+  {re:/^S&P 500|^Nasdaq/i,tz:'America/New_York',open:[9,30],close:[16,0],name:'New York',
+   hol:['2026-01-01','2026-01-19','2026-02-16','2026-04-03','2026-05-25','2026-06-19','2026-07-03','2026-09-07','2026-11-26','2026-12-25',
+        '2027-01-01','2027-01-18','2027-02-15','2027-03-26','2027-05-31','2027-06-18','2027-07-05','2027-09-06','2027-11-25','2027-12-24']},
+  {re:/stoxx 600/i,tz:'Europe/Berlin',open:[9,0],close:[17,30],name:'Europe',
+   hol:['2026-01-01','2026-04-03','2026-04-06','2026-05-01','2026-12-24','2026-12-25','2026-12-31',
+        '2027-01-01','2027-03-26','2027-03-29','2027-12-24','2027-12-31']},
+  {re:/nikkei/i,tz:'Asia/Tokyo',open:[9,0],close:[15,30],name:'Tokyo',
+   hol:['2026-01-01','2026-01-02','2026-01-12','2026-02-11','2026-02-23','2026-03-20','2026-04-29','2026-05-04','2026-05-05','2026-05-06',
+        '2026-07-20','2026-08-11','2026-09-21','2026-09-22','2026-09-23','2026-10-12','2026-11-03','2026-11-23','2026-12-31',
+        '2027-01-01','2027-01-11']}
+];
+function mktLocal(tz,date){
+  const p=Object.fromEntries(new Intl.DateTimeFormat('en-GB',{timeZone:tz,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',weekday:'short',hourCycle:'h23'}).formatToParts(date).map(x=>[x.type,x.value]));
+  return {day:p.year+'-'+p.month+'-'+p.day,mins:(+p.hour)*60+(+p.minute),wd:p.weekday};
+}
+function mktUkTime(tz,hm,now){
+  // UK clock time of the exchange's local hh:mm today (handles differing DST dates).
+  const loc=mktLocal(tz,now),uk=mktLocal('Europe/London',now);
+  let t=hm[0]*60+hm[1]-(loc.mins-uk.mins+(loc.day>uk.day?1440:loc.day<uk.day?-1440:0));
+  t=(t+1440)%1440;return String(Math.floor(t/60)).padStart(2,'0')+':'+String(t%60).padStart(2,'0');
+}
+function mktStatus(m,tradingDay,now){
+  const l=mktLocal(m.tz,now),o=m.open[0]*60+m.open[1],c=m.close[0]*60+m.close[1];
+  if(l.wd==='Sat'||l.wd==='Sun')return {t:m.name+' closed · weekend',k:'closed'};
+  if(m.hol.includes(l.day))return {t:m.name+' closed today · public holiday',k:'closed'};
+  if(l.mins<o)return {t:m.name+' opens '+mktUkTime(m.tz,m.open,now)+' UK',k:'pre'};
+  if(tradingDay&&tradingDay<l.day&&l.mins>=o+30)return {t:'No '+m.name+' trading today',k:'closed'};
+  if(l.mins>=c)return {t:m.name+' closed for the day',k:'closed'};
+  return {t:m.name+' open',k:'open'};
+}
+function markPulseSessions(){
+  const now=new Date();
+  document.querySelectorAll('#market-pulse .r24-snapshot-item').forEach(tile=>{
+    const label=(tile.firstElementChild&&tile.firstElementChild.textContent||'').trim();
+    const m=MKT_SESSIONS.find(x=>x.re.test(label));
+    let tag=tile.querySelector('.mkt-session');
+    if(!m){if(tag)tag.remove();return}
+    const sym={London:/EMIM/i.test(label)?'EMIM.L':'^FTSE','New York':/nasdaq/i.test(label)?'^IXIC':'^GSPC',Europe:'^STOXX',Tokyo:'^N225'}[m.name];
+    const q=typeof qMap!=='undefined'?qMap.get(sym):null;
+    const st=mktStatus(m,q&&q.tradingDay,now);
+    if(!tag){tag=document.createElement('div');tag.className='mkt-session';tile.append(tag)}
+    if(tag.textContent!==st.t)tag.textContent=st.t;
+    tag.dataset.state=st.k;tag.classList.remove('layout-hidden');
+  });
+}
+try{const baseSnap2=r24Snapshot;r24Snapshot=function(){const r=baseSnap2.apply(this,arguments);try{markPulseSessions();}catch(e){}return r;};}catch(e){}
+try{const basePulse2=renderPulse;renderPulse=function(){const r=basePulse2.apply(this,arguments);try{markPulseSessions();}catch(e){}return r;};}catch(e){}
+document.addEventListener('DOMContentLoaded',()=>{try{markPulseSessions()}catch(e){}});
+setInterval(()=>{try{markPulseSessions()}catch(e){}},60000);
+
 // ETF Trackers: catalogue counts belong in Data Quality; tidy duplicated or hedged labels.
 function tidyEtf(){
   const panel=$L('etf-tracker-panel');if(!panel)return;
@@ -526,7 +585,7 @@ function cleanReading(){
   });
   // Tile captions that only explain (no figure or date) go; captions with data stay.
   stage.querySelectorAll(TILE_GRIDS.split(',').map(g=>g+' > * > :nth-child(n+3)').join(',')).forEach(n=>{
-    if(n.closest('#view-quality,.metric-commentary'))return;
+    if(n.closest('#view-quality,.metric-commentary')||n.classList.contains('mkt-session'))return;
     if(n.children.length===0&&!/\d/.test(n.textContent))n.classList.add('layout-hidden');
   });
   $L('company-dates')?.classList.add('layout-hidden');

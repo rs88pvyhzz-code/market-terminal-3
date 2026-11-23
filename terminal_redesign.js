@@ -126,7 +126,7 @@ function r24Conditions(host){
   const MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const dm=d=>{const m=String(d||'').match(/(\d{4})-(\d{2})-(\d{2})/);return m?(+m[3])+' '+MON[+m[2]-1]:String(d||'Unavailable')};
   const sg=n=>(n>0?'+':'')+fmt(n,1);
-  const bdates=[...new Set(breadth.map(b=>dm(b.date)))];
+  const bdates=breadth.map(b=>dm(b.date)); // one date per breadth row, aligned with it
   r24Table(host,['Indicator','Latest observation','Change / context','Date'],[
     ['Volatility',vix?'VIX '+fmt(vix.price,2):'Unavailable',vix?pc(vix.changePct):'Unavailable',vix?dm(vix.asOf):'Unavailable'],
     ['Market breadth',list(breadth.map(b=>b.name+': '+b.advancers+' up / '+b.decliners+' down')),list(breadth.map(b=>b.above200+'/'+b.eligible200+' above 200D')),list(bdates)],

@@ -47,3 +47,6 @@
 .release210 #view-equities .panel h3,.release210 #view-bonds .panel h3{line-height:1.4}
 @media(max-width:1100px){.release210 #market-pulse{grid-template-columns:repeat(4,minmax(0,1fr))!important}.release210 #market-pulse .r24-snapshot-item:nth-child(7n){border-right:1px solid #343b45}.release210 #market-pulse .r24-snapshot-item:nth-child(4n){border-right:0}.release210 #gilts .r28-gilt-facts{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:700px){.release210 #market-pulse{grid-template-columns:repeat(2,minmax(0,1fr))!important}.release210 #market-pulse .r24-snapshot-item:nth-child(4n){border-right:1px solid #343b45}.release210 #market-pulse .r24-snapshot-item:nth-child(2n){border-right:0}.release210 #market-pulse .r24-snapshot-item strong{font-size:18px!important}.release210 #gilts .r28-gilt-facts{grid-template-columns:repeat(2,minmax(0,1fr))}.release210 #research-view-4>.r25-section-links{position:relative;top:auto}}
+#market-pulse .mkt-session{font-size:11px;margin-top:4px;letter-spacing:.02em;color:#9aa4b2}
+#market-pulse .mkt-session[data-state="closed"]{color:#f0a64a}
+#market-pulse .mkt-session[data-state="open"]{color:#4fc38a}
