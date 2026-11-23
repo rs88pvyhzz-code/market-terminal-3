@@ -13,7 +13,7 @@ const r210Extra=[
  ['BTC-USD','Bitcoin · USD','quote'],
  ['^STOXX','Europe · STOXX 600','quote'],
  ['^N225','Japan · Nikkei 225','quote'],
- ['EEM','Emerging Mkts · ETF','quote']
+ ['EMIM.L','Emerging Mkts · EMIM (LSE)','quote']
 ];
 const previousSnapshot=r24Snapshot;
 r24Snapshot=function(){
@@ -24,7 +24,7 @@ r24Snapshot=function(){
   tile.type='button';tile.setAttribute('aria-label','Open '+label);
   tile.onclick=()=>{if(kind==='us10'){activateWorkspace('bonds',{scroll:false});[...($r('mt-bond-nav')?.querySelectorAll('button')||[])].find(b=>b.textContent.trim()==='Yield Curves')?.click();}else marketInstrument(symbol);};
   const q=qMap.get(symbol);
-  tile.append(el('div','lab',label));
+  tile.append(el('div','lab',label+(symbol==='EMIM.L'&&q?.currency?' · '+q.currency:'')));
   if(kind==='us10'){
    const rows=(D.us_rates||[]).filter(x=>isReal(x.DGS10));
    const cur=rows.at(-1),prior=rows.at(-2);
@@ -51,14 +51,14 @@ r24Snapshot=function(){
  const expectedDate=Number.isFinite(expected.valueOf())?expected.toISOString().slice(0,10):'';
  let lag=$r('r210-official-yield-lag');
  if(!lag){lag=el('p','note r210-official-yield-lag');lag.id='r210-official-yield-lag';host.after(lag);}
- const lagged=[['UK 10Y spot',latestUK?.date],['US 10Y Treasury',latestUS?.date]]
+ const lagged=[['BoE UK 10Y spot',latestUK?.date],['US 10Y Treasury',latestUS?.date]]
   .filter(([,date])=>!date||expectedDate&&date<expectedDate);
  lag.textContent=lagged.length?'Official yield release lag: '+lagged.map(([name,date])=>name+' '+(date||'unavailable')).join(' · ')+
   '. Prior business day '+(expectedDate||'unknown')+' not yet available in this verified source. DMO individual gilt prices are a separate data feed.':'';
  lag.hidden=!lagged.length;
  const existing=$r('r210-snapshot-note');
  if(!existing){
-  const note=el('p','mini r210-market-note','14 dated indicators · quoted units shown in labels · EEM is an ETF proxy for emerging equities, not an official emerging-markets index · US 10Y is the official Treasury yield series.');
+  const note=el('p','mini r210-market-note','14 dated indicators · quoted units shown in labels · EMIM is iShares Core MSCI EM IMI priced in sterling on the LSE: an ETF proxy including small caps and GBP/USD moves, not an official emerging-markets index · US 10Y is the official Treasury yield series.');
   note.id='r210-snapshot-note';host.after(note);
  }
 };

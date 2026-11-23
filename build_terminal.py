@@ -68,7 +68,7 @@ INSTRUMENTS = [
  ('Equities','^JKSE','Jakarta Composite','index'),('Equities','^STI','Singapore STI','index'),
  ('Equities','^VIX','VIX volatility','volatility'),
  ('ETFs','ACWI','iShares MSCI ACWI ETF','etf'),('ETFs','URTH','iShares MSCI World ETF','etf'),
- ('ETFs','EEM','iShares MSCI EM ETF','etf'),('ETFs','EFA','iShares MSCI EAFE ETF','etf'),
+ ('ETFs','EEM','iShares MSCI EM ETF','etf'),('ETFs','EMIM.L','iShares Core MSCI EM IMI (LSE)','etf'),('ETFs','EFA','iShares MSCI EAFE ETF','etf'),
  ('ETFs','SPY','S&P 500 ETF (SPY)','etf'),('ETFs','QQQ','Nasdaq 100 ETF (QQQ)','etf'),
  ('ETFs','IEUR','European equities ETF','etf'),('ETFs','EWJ','Japan equities ETF','etf'),
  ('ETFs','EWU','UK equities ETF','etf'),('ETFs','INDA','India equities ETF','etf'),
@@ -146,6 +146,33 @@ def get_bytes(url, key, offline=False, max_age_hours=4):
             if n<2: time.sleep(0.6*(2**n))
     if file.exists(): return file.read_bytes(), True, 'stale cache after fetch failed: '+str(last_error)
     raise RuntimeError(str(last_error))
+
+CNBC_UK10Y='https://quote.cnbc.com/quote-html-webservice/restQuote/symbolType/symbol?'+urllib.parse.urlencode(
+    {'symbols':'UK10Y-GB','requestMethod':'itv','noform':'1','partnerId':'2','fund':'1','exthrs':'1','output':'json'})
+
+def fetch_cnbc_uk10y(opts):
+    """Indicative intraday UK 10Y gilt yield from CNBC's public quote feed.
+
+    Undocumented, unofficial endpoint: labelled INDICATIVE on the page and never
+    used for any calculation, chart or history. Fails closed (returns None) on
+    any format change or implausible value; the DMO/BoE figures are unaffected.
+    """
+    if opts.offline: return None,None
+    try:
+        raw,cached,_=get_bytes(CNBC_UK10Y,'cnbc_uk10y',False,0.25)
+        q=json.loads(raw.decode('utf-8'))['FormattedQuoteResult']['FormattedQuote'][0]
+        if str(q.get('symbol','')).upper()!='UK10Y-GB': raise ValueError('unexpected symbol')
+        num=lambda v: safe_float(str(v or '').replace('%','').replace('+','').replace(',','').strip())
+        value=num(q.get('last'))
+        if value is None or not 0<value<15: raise ValueError('implausible yield '+str(q.get('last')))
+        change=num(q.get('change'))
+        if change is not None and abs(change)>1: change=None
+        return {'value':round(value,3),'changePct':change,'time':q.get('last_time') or q.get('last_timedate'),
+                'retrievedAt':today_utc().isoformat(timespec='seconds'),'cached':bool(cached),
+                'source':'CNBC UK10Y-GB','sourceUrl':'https://www.cnbc.com/quotes/UK10Y-GB',
+                'status':'Indicative intraday quote; unofficial, not used in any calculation'},None
+    except Exception as exc:
+        return None,'CNBC UK 10Y indicative quote unavailable: '+str(exc)[:80]
 
 def prior_close(pts, last_day, meta):
     # The chart's 'chartPreviousClose' is the start-of-chart comparison and is
@@ -657,6 +684,8 @@ def build(opts):
     gilts,gilt_history,gilt_warnings,gilt_cached=gilt_market.collect(sys.modules[__name__],opts)
     warnings.extend(gilt_warnings)
     gilt_market.publish(ROOT/'public')
+    uk10y_indicative,cnbc_warning=fetch_cnbc_uk10y(opts)
+    if cnbc_warning:warnings.append(cnbc_warning)
     cached_count+=gilt_cached
     print(f'Gilts: {len(gilts)} DMO bonds ({sum(x.get("indexLinked",False) for x in gilts)} index-linked), {sum(x["quoted"] for x in gilts)} dated price quotes; {len(gilt_history)} saved observations',flush=True)
     # Corporate spreads are sourced ICE/FRED OAS index levels, not single-bond yields.
@@ -709,7 +738,7 @@ def build(opts):
             'watchlist_news':watch_news,'watchlistCoverage':watch_coverage,
             'credit_spreads':credit_spreads,'market_valuations':market_valuations,'company_events':company_events,'companyEventCoverage':event_coverage,'companyProfiles':profiles,'companyProfilesCoverage':profile_coverage,
             'quality':quality,'economicPrints':economic_prints,'forecastCoverage':{'sourced':forecast_count,'series':len(economic_prints)},
-            'us_treasuries':us_bonds,'us_treasury_history':us_treasury_history,'gilts':gilts,'gilt_history':gilt_history,'giltFreshness':json.loads((ROOT/'.terminal_sources/dmo_verification.json').read_text()) if (ROOT/'.terminal_sources/dmo_verification.json').exists() else {},
+            'us_treasuries':us_bonds,'us_treasury_history':us_treasury_history,'gilts':gilts,'gilt_history':gilt_history,'ukGilt10yIndicative':uk10y_indicative,'giltFreshness':json.loads((ROOT/'.terminal_sources/dmo_verification.json').read_text()) if (ROOT/'.terminal_sources/dmo_verification.json').exists() else {},
 'fundamentals':fundamentals,'fundamentalsCoverage':fcoverage,
             'priceHistorySymbols':history_symbols,'priceHistoryCoverage':history_coverage,
             'marketHistoryMetrics':market_history_metrics,

@@ -134,17 +134,38 @@ function r24Conditions(host){
     ['Credit spreads',list(credit.map(c=>c.name+' '+fmt(c.latestBp,0)+' bp')),list(credit.map(c=>'1M '+(c.change30Bp>0?'+':'')+fmt(c.change30Bp,0)+' bp')),list(credit.map(c=>dm(c.date)))]
   ],'r24-conditions-table');
 }
+// UK 10Y tile: redemption yield of the conventional gilt nearest 10 years, from the
+// DMO D10B purchase/sale prices (published ~14:00 London, same day). Level uses the
+// bid/offer mid; day change uses offer-to-offer (gilt_history stores offer only), so
+// the DMO spread cancels. Low-coupon gilts (<2%) are excluded: their yields are
+// depressed by tax-driven retail demand. Falls back to the BoE 10Y zero-coupon spot.
+function r24DmoTenYear(){
+  const gilts=(D.gilts||[]).filter(g=>g.quoted&&!g.indexLinked&&g.coupon>=2&&!(typeof GILT_YIELD_REVIEW!=='undefined'&&GILT_YIELD_REVIEW[g.isin]));
+  if(!gilts.length||typeof giltValuation!=='function')return null;
+  const asOf=gilts[0].asOf,target=giltDay(asOf);if(!target)return null;target.setUTCFullYear(target.getUTCFullYear()+10);
+  const g=gilts.filter(x=>x.asOf===asOf).sort((a,b)=>Math.abs(giltDay(a.maturity)-target)-Math.abs(giltDay(b.maturity)-target))[0];
+  if(!g)return null;
+  const offerYield=(clean,date)=>{const f=giltCashflows(g,date,true);return f?giltValuation(g,clean,date,clean+f.accrued)?.ytm:null;};
+  const mid=giltValuation(g,(g.bidClean+g.askClean)/2,asOf,(g.bidDirty+g.askDirty)/2);if(!mid)return null;
+  const hist=(D.gilt_history||[]).filter(x=>x.ticker===g.ticker&&x.date<asOf).sort((a,b)=>a.date<b.date?-1:1).at(-1);
+  const now=offerYield(g.askClean,asOf),before=hist?offerYield(hist.close,hist.date):null;
+  return {gilt:g,date:asOf,ytm:mid.ytm,changeBp:Number.isFinite(now)&&Number.isFinite(before)?(now-before)*100:null,priorDate:hist?.date};
+}
 function r24Snapshot(){
   const host=$('market-pulse');if(!host)return;host.replaceChildren();
   for(const [symbol,label] of [['^FTSE','FTSE 100'],['^GSPC','S&P 500'],['^IXIC','Nasdaq Composite'],['UK10','UK 10Y gilt yield'],['GBPUSD=X','GBP/USD'],['BZ=F','Brent crude'],['^VIX','VIX']]){
     const tile=el('button','r24-snapshot-item'),q=qMap.get(symbol),rows=(D.uk_rates||[]).filter(x=>Number.isFinite(x.gilt10y)),last=rows.at(-1),prior=rows.at(-2);
     tile.type='button';tile.setAttribute('aria-label','Open '+(symbol==='^VIX'?'VIX':label));tile.onclick=()=>symbol==='UK10'?activateWorkspace('bonds'):marketInstrument(symbol);
     tile.append(el('div','lab',label+(symbol==='BZ=F'&&q?.currency?' · '+q.currency:'')));
-    if(symbol==='UK10')tile.append(el('strong','',last?fmt(last.gilt10y,2)+'%':'Unavailable'),el('div','mini',last&&prior?fmt((last.gilt10y-prior.gilt10y)*100,1)+' bp since '+prior.date:'Change unavailable'),el('div','mini',last?.date||'Date unavailable'));
+    if(symbol==='UK10'){const dmo=r24DmoTenYear(),ind=D.ukGilt10yIndicative;
+      if(dmo)tile.append(el('strong','',fmt(dmo.ytm,2)+'%'),el('div','mini',dmo.changeBp!=null?fmt(dmo.changeBp,1)+' bp since '+dmo.priorDate:'Change unavailable'),el('div','mini','DMO '+dmo.date+' · '+dmo.gilt.name));
+      else tile.append(el('strong','',last?fmt(last.gilt10y,2)+'%':'Unavailable'),el('div','mini',last&&prior?fmt((last.gilt10y-prior.gilt10y)*100,1)+' bp since '+prior.date:'Change unavailable'),el('div','mini',last?'BoE spot '+last.date:'Date unavailable'));
+      if(ind&&Number.isFinite(ind.value)){const t=Date.parse(ind.time||ind.retrievedAt),when=Number.isFinite(t)?new Date(t).toLocaleString('en-GB',{timeZone:'Europe/London',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}):'time unknown';
+        const line=el('div','mini r24-indicative','Indicative '+fmt(ind.value,3)+'% · CNBC '+when);line.title=ind.status||'Indicative intraday quote; unofficial';tile.append(line);}}
     else tile.append(el('strong','',q?fmt(q.price,symbol==='GBPUSD=X'?4:2):'Unavailable'),el('div',q?.changePct>0?'pos':q?.changePct<0?'neg':'mini',q?pc(q.changePct):'Change unavailable'),el('div','mini',(symbol==='^VIX'?'Index points · ':'')+(q?.asOf||'Date unavailable')));
     host.append(tile);
   }
-  let sources=$('r24-snapshot-sources');if(!sources){sources=el('div','mini');sources.id='r24-snapshot-sources';$('overview-board').append(sources);}sources.replaceChildren(r24Link('Market quotes: Yahoo Finance','https://finance.yahoo.com/'),document.createTextNode(' · '),r24Link('UK yield: Bank of England','https://www.bankofengland.co.uk/boeapps/database/'));
+  let sources=$('r24-snapshot-sources');if(!sources){sources=el('div','mini');sources.id='r24-snapshot-sources';$('overview-board').append(sources);}sources.replaceChildren(r24Link('Market quotes: Yahoo Finance','https://finance.yahoo.com/'),document.createTextNode(' · '),r24Link('UK 10Y: DMO gilt prices','https://www.dmo.gov.uk/data/pdfdatareport?reportCode=D10B'),document.createTextNode(' · '),r24Link('fallback: Bank of England','https://www.bankofengland.co.uk/boeapps/database/'),document.createTextNode(' · '),r24Link('indicative intraday: CNBC','https://www.cnbc.com/quotes/UK10Y-GB'));
   let warning=$('r24-snapshot-warning');if(!warning){warning=el('p','research-warning');warning.id='r24-snapshot-warning';$('overview-board').append(warning);}const issues=(D.marketBriefing?.alerts||[]).filter(x=>x.kind==='Coverage').map(x=>x.title+' · '+x.date);
   const age=Date.now()-Date.parse(D.generatedAt.replace(' UTC','Z').replace(' ','T'));if(age>(D.marketBriefing?.thresholds?.criticalMaxAgeDays||5)*86400000)issues.unshift('Scheduled snapshot is stale; source dates below are historical.');warning.textContent=issues.join(' · ');warning.hidden=!issues.length;
   $('overview-board').querySelector('h2').textContent='GLOBAL MARKET SNAPSHOT';
