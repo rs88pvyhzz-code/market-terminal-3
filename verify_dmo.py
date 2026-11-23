@@ -33,5 +33,8 @@ console.log('Current official DMO quotes: '+eligible+' unrestricted gilt gross/n
 console.log(JSON.stringify({conventional:total,eligibleForAutomaticSelection:eligible,reviewRestricted,accruedReconciled:reconciled,modelConventionExceptions:exceptions}));
 '''
 with tempfile.NamedTemporaryFile('w',suffix='.js') as f:
- f.write(js);f.flush();result=subprocess.run(['node',f.name],check=True,text=True,capture_output=True)
+ f.write(js);f.flush();result=subprocess.run(['node',f.name],text=True,capture_output=True)
+ if result.returncode:
+  # Show why the gilt maths check failed (it was hidden before), then fail the run.
+  print('GILT MATHS CHECK FAILED (node exit %d)'%result.returncode);print(result.stderr[-3000:]);print(result.stdout[-1000:]);sys.exit(1)
  print(result.stdout);d['yieldValidation']=json.loads(result.stdout.strip().splitlines()[-1]);path.write_text(json.dumps(d,indent=2)+'\n')
